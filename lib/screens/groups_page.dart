@@ -26,58 +26,10 @@ class _GroupsPageState extends State<GroupsPage> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final groups = await _api.fetchGroups();
-      final members = await _api.fetchMembers();
-
-      // try to find groups for the logged username
-      // heuristics: member row may contain keys like name, username, email, member_name
-      final username = widget.username.toLowerCase();
-
-      // find member rows matching username
-      final matchedMembers = members.where((m) {
-        if (m is Map) {
-          for (final key in m.keys) {
-            final value = m[key];
-            if (value is String && value.toLowerCase() == username) return true;
-          }
-        }
-        return false;
-      }).toList();
-
-      // attempt to map group ids: look for common member->group key
-      List<dynamic> userGroups = [];
-
-      if (matchedMembers.isNotEmpty) {
-        final member = matchedMembers.first as Map;
-        // check some keys that may reference group id
-        final possibleKeys = ['group_id', 'group', 'groups', 'Group', 'GroupId'];
-        dynamic groupRef;
-        for (final k in possibleKeys) {
-          if (member.containsKey(k)) {
-            groupRef = member[k];
-            break;
-          }
-        }
-
-        if (groupRef != null) {
-          // find group(s) matching id or name
-          userGroups = groups.where((g) {
-            if (g is Map) {
-              if (groupRef is String || groupRef is num) {
-                return g.values.any((v) => v == groupRef);
-              }
-            }
-            return false;
-          }).toList();
-        }
-      }
-
-      // fallback: show all groups if unable to match
-      if (userGroups.isEmpty) userGroups = groups;
+      // fetch only groups for the authenticated user
+      final userGroups = await _api.fetchMyGroups();
 
       setState(() {
-        _groups = groups;
-        _members = members;
         _userGroups = userGroups;
       });
     } catch (e) {

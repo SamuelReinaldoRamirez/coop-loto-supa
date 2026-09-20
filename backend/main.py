@@ -1,6 +1,26 @@
-from fastapi import FastAPI
+import os
+import logging
+from datetime import datetime, timedelta
+from typing import Optional
+
+import jwt
+from fastapi import FastAPI, Depends, Header, HTTPException
 from database import engine
 from sqlalchemy import text
+
+from jwt import InvalidTokenError
+
+# Configure logging BEFORE creating logger
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# JWT secret (can be set in backend/.env as SECRET_KEY)
+# Use a secret of at least 32 chars for HS256 (PyJWT recommendation)
+SECRET_KEY = os.getenv('SECRET_KEY')
+logger.info(f'Backend initialized with SECRET_KEY: {SECRET_KEY[:10]}...')
 
 app = FastAPI()
 
@@ -76,6 +96,146 @@ def get_all_from_table(table_name: str):
         rows = result.mappings().all()
 
     return rows
+
+
+# def _get_user_id_from_token(authorization: Optional[str] = Header(None)):
+#     if not authorization:
+#         logger.warning('[auth] Missing authorization header')
+#         raise HTTPException(status_code=401, detail='Missing authorization')
+
+#     try:
+#         logger.info(f'[auth] Authorization header: {authorization[:50]}...')
+#         scheme, token = authorization.split()
+#         if scheme.lower() != 'bearer':
+#             logger.warning(f'[auth] Invalid auth scheme: {scheme}')
+#             raise HTTPException(status_code=401, detail='Invalid auth scheme')
+#         try:
+#             payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+#             logger.info(f'[auth] token decoded: sub={payload.get("sub")}')
+#         except Exception as e:
+#             logger.error(f'[auth] token decode error: {e}')
+#             raise
+#         user_id = payload.get('sub')
+#         if user_id is None:
+#             logger.warning('[auth] No sub claim in token')
+#             raise HTTPException(status_code=401, detail='Invalid token')
+#         logger.info(f'[auth] user_id extracted: {user_id}')
+#         return int(user_id)
+#     except HTTPException:
+#         raise
+#     except Exception as e:
+#         logger.error(f'[auth] Unexpected error: {e}')
+#         raise HTTPException(status_code=401, detail='Invalid token')
+
+def _get_user_id_from_token(
+    authorization: Optional[str] = Header(None)
+):
+    if authorization is None:
+        logger.warning("[AUTH] Missing Authorization header")
+        raise HTTPException(status_code=401, detail="Missing authorization")
+
+    try:
+        logger.info(f"[AUTH] Header = {authorization}")
+
+        scheme, token = authorization.split()
+
+        if scheme.lower() != "bearer":
+            raise HTTPException(status_code=401, detail="Invalid auth scheme")
+
+        logger.info(f"[AUTH] JWT = {token}")
+
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=["HS256"]
+        )
+
+        logger.info(f"[AUTH] Payload = {payload}")
+
+        return int(payload["sub"])
+
+    except InvalidTokenError as e:
+        logger.error(f"[AUTH] Invalid JWT : {e}")
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.exception("[AUTH] Unexpected error")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.get("/me")
+def me(user_id: int = Depends(_get_user_id_from_token)):
+    query = text("""
+        SELECT id, pseudo
+        FROM "Users"
+        WHERE id = :id
+    """)
+
+    with engine.connect() as conn:
+        user = conn.execute(query, {"id": user_id}).mappings().first()
+
+    return user
+
+@app.post('/login')
+def login(body: dict):
+    pseudo = body.get('pseudo')
+    password = body.get('password')
+    if not pseudo or not password:
+        raise HTTPException(status_code=400, detail='Missing credentials')
+
+    query = text('''
+        SELECT * FROM "Users" WHERE pseudo = :pseudo
+    ''')
+
+    with engine.connect() as connection:
+        result = connection.execute(query, {'pseudo': pseudo}).mappings().first()
+
+    if not result:
+        raise HTTPException(status_code=401, detail='Invalid credentials')
+
+    # NOTE: plaintext password comparison - replace with secure hash check if needed
+    if result.get('password') != password:
+        raise HTTPException(status_code=401, detail='Invalid credentials')
+
+    payload = {
+        'sub': str(result.get('id')),
+        'pseudo': result.get('pseudo'),
+        'exp': datetime.utcnow() + timedelta(days=7)
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+
+    return {'token': token, 'pseudo': result.get('pseudo'), 'id': result.get('id')}
+
+
+@app.get('/my_groups')
+def my_groups(user_id: int = Depends(_get_user_id_from_token)):
+    logger.info(f'[my_groups] requested for user_id={user_id}')
+
+    query_groups = text('''
+        SELECT g.*
+        FROM "Groups" g
+        JOIN "Members" m ON g.id = m."group"
+        WHERE m."user" = :uid
+        ORDER BY g.id
+    ''')
+
+    query_members = text('''
+        SELECT * FROM "Members" WHERE "user" = :uid ORDER BY id
+    ''')
+
+    with engine.connect() as connection:
+        res_g = connection.execute(query_groups, {'uid': user_id})
+        groups = res_g.mappings().all()
+
+        res_m = connection.execute(query_members, {'uid': user_id})
+        members = res_m.mappings().all()
+
+    logger.info(f'[my_groups] found groups_count={len(groups)} members_count={len(members)}')
+
+    return {'groups': groups, 'members': members}
 
 
 @app.get("/groups")

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -10,18 +11,55 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final _controller = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _loading = false;
+  final AuthService _auth = AuthService();
 
-  void _submit() {
+  @override
+  void initState() {
+    super.initState();
+    _checkStoredToken();
+  }
+
+  Future<void> _checkStoredToken() async {
+    setState(() => _loading = true);
+    try {
+      final ok = await _auth.tryAutoLogin();
+      if (ok) {
+        final pseudo = await _auth.getPseudo() ?? '';
+        if (!mounted) return;
+        context.go('/groups?username=${Uri.encodeComponent(pseudo)}');
+        return;
+      }
+    } catch (e) {
+      // ignore auto-login errors, show login form
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _submit() async {
     final username = _controller.text.trim();
     if (username.isEmpty) return;
     setState(() => _loading = true);
-    // For now simple local "auth": just navigate with the username as query param
-    Future.delayed(const Duration(milliseconds: 300), () {
-      setState(() => _loading = false);
-      // navigate to groups page, pass username as query param for safer routing
-      context.go('/groups?username=${Uri.encodeComponent(username)}');
-    });
+    final password = _passwordController.text;
+    try {
+      final resp = await _auth.login(username, password);
+      final pseudo = resp['pseudo'] as String? ?? username;
+      if (!mounted) return;
+      context.go('/groups?username=${Uri.encodeComponent(pseudo)}');
+    } catch (e) {
+      // show simple error
+      if (!mounted) return;
+      // show detailed error to help debugging
+      final msg = e is Exception ? e.toString() : 'Login failed';
+      // also print to console
+      // ignore: avoid_print
+      print('[Login] error: $msg');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Login failed: $msg')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -36,6 +74,13 @@ class _LoginPageState extends State<LoginPage> {
             TextField(
               controller: _controller,
               decoration: const InputDecoration(labelText: 'Nom d\'utilisateur'),
+              onSubmitted: (_) => _submit(),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'Mot de passe'),
+              obscureText: true,
               onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: 12),
