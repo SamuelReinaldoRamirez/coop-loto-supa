@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'screens/login_page.dart';
 import 'screens/groups_page.dart';
 import 'screens/group_detail_page.dart';
+import 'screens/home_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,9 +22,17 @@ class MyApp extends StatelessWidget {
           builder: (context, state) => const LoginPage(),
         ),
         GoRoute(
+          path: '/home',
+          builder: (context, state) {
+            final username = state.extra as String;
+            return HomePage(username: username);
+          },
+        ),
+
+        GoRoute(
           path: '/groups',
           builder: (context, state) {
-            final username = state.extra as String? ?? state.uri.queryParameters['username'] ?? '';
+            final username = state.extra as String;
             return GroupsPage(username: username);
           },
         ),

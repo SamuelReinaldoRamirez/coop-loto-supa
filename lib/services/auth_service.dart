@@ -23,16 +23,9 @@ class AuthService {
   Future<void> clear() async {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _pseudoKey);
-  }
 
-  // Future<bool> tryAutoLogin() async {
-  //   final token = await getToken();
-  //   final pseudo = await getPseudo();
-  //   if (token == null) return false;
-  //   _api.setToken(token);
-  //   // Optionally validate token by calling an endpoint
-  //   return pseudo != null;
-  // }
+    _api.clearToken();
+  }
 
   Future<bool> tryAutoLogin() async {
   final token = await getToken();

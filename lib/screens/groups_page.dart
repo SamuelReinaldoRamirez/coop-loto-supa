@@ -33,7 +33,7 @@ class _GroupsPageState extends State<GroupsPage> {
         _userGroups = userGroups;
       });
     } catch (e) {
-      // ignore
+      print('[Groups] Error loading groups: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -42,7 +42,15 @@ class _GroupsPageState extends State<GroupsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Groups for ${widget.username}')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            context.go('/home', extra: widget.username);
+          },
+        ),
+        title: Text('Groups for ${widget.username}'),
+        ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
@@ -55,7 +63,11 @@ class _GroupsPageState extends State<GroupsPage> {
                   onTap: () {
                     // navigate to group detail using GoRouter and pass group map + username as query
                     final encoded = Uri.encodeComponent(widget.username);
-                    context.go('/group/${idx}?username=$encoded', extra: g as Map<String, dynamic>?);
+                    context.push(
+                      '/group/${g['id']}?username=$encoded',
+                      extra: g as Map<String, dynamic>,
+                    );
+                    // context.go('/group/${idx}?username=$encoded', extra: g as Map<String, dynamic>?);
                   },
                 );
               },

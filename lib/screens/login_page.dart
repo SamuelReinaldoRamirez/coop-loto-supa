@@ -28,7 +28,8 @@ class _LoginPageState extends State<LoginPage> {
       if (ok) {
         final pseudo = await _auth.getPseudo() ?? '';
         if (!mounted) return;
-        context.go('/groups?username=${Uri.encodeComponent(pseudo)}');
+        // context.go('/groups?username=${Uri.encodeComponent(pseudo)}');
+        context.go('/home', extra: pseudo);
         return;
       }
     } catch (e) {
@@ -47,7 +48,8 @@ class _LoginPageState extends State<LoginPage> {
       final resp = await _auth.login(username, password);
       final pseudo = resp['pseudo'] as String? ?? username;
       if (!mounted) return;
-      context.go('/groups?username=${Uri.encodeComponent(pseudo)}');
+      context.go('/home', extra: pseudo);
+      // context.go('/groups?username=${Uri.encodeComponent(pseudo)}');
     } catch (e) {
       // show simple error
       if (!mounted) return;

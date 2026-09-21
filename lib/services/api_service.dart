@@ -76,9 +76,27 @@ class ApiService {
     return resp.data as List<dynamic>;
   }
 
+  Future<List<dynamic>> fetchGroupMembers(int groupId) async {
+    print('[Api] fetchGroupMembers -> GET /groups/$groupId/members');
+
+    final resp = await _dio.get('/groups/$groupId/members');
+
+    print(
+      '[Api] fetchGroupMembers status=${resp.statusCode}',
+    );
+
+    final data = resp.data as Map<String, dynamic>;
+
+    return data['members'] as List<dynamic>;
+  }
+
   void setToken(String token) {
     _dio.options.headers['Authorization'] = 'Bearer $token';
     print('[Api] TOKEN SET: $token');
+  }
+  void clearToken() {
+    _dio.options.headers.remove('Authorization');
+    print('[Api] TOKEN CLEARED');
   }
 
   Future<Map<String, dynamic>> login(String pseudo, String password) async {

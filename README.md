@@ -1,5 +1,23 @@
 # coop_loto_supa
 
+starting project : 
+
+backend : 
+cd backend
+source venv/Scripts/activate
+python -m uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+
+frontend : 
+flutter emulators --launch Pixel_7_27-07-2025
+flutter run
+
+user : 
+user0
+aaaaaa
+
+lancer les tests :
+flutter test integration_test/navigation_test.dart
+
 A new Flutter project.
 
 ## Getting Started

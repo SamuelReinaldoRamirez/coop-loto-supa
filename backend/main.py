@@ -250,6 +250,53 @@ def get_members():
     return get_all_from_table("Members")
 
 
+@app.get("/groups/{group_id}/members")
+def get_group_members(
+    group_id: int,
+    user_id: int = Depends(_get_user_id_from_token)
+):
+    logger.info(
+        f'[group_members] requested for group_id={group_id} by user_id={user_id}'
+    )
+
+    query = text("""
+        SELECT
+            m.id AS member_id,
+            m."group" AS group_id,
+            m."user" AS user_id,
+            u.pseudo
+        FROM "Members" m
+        JOIN "Users" u
+            ON u.id = m."user"
+        WHERE m."group" = :group_id
+          AND EXISTS (
+              SELECT 1
+              FROM "Members" my_membership
+              WHERE my_membership."group" = :group_id
+                AND my_membership."user" = :user_id
+          )
+        ORDER BY m.id
+    """)
+
+    with engine.connect() as connection:
+        members = connection.execute(
+            query,
+            {
+                "group_id": group_id,
+                "user_id": user_id,
+            }
+        ).mappings().all()
+
+    logger.info(
+        f'[group_members] found members_count={len(members)}'
+    )
+
+    return {
+        "group_id": group_id,
+        "members": members,
+    }
+
+
 @app.get("/split_rules")
 def get_split_rules():
 

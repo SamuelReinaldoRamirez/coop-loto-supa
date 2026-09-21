@@ -22,33 +22,19 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     _loadMembers();
   }
 
-  Future<void> _loadMembers() async {
+    Future<void> _loadMembers() async {
     setState(() => _loading = true);
-    try {
-      final members = await _api.fetchMembers();
-      // try to filter by group id or name found in widget.group
-      final group = widget.group;
-      dynamic groupId;
-      if (group.containsKey('id')) groupId = group['id'];
-      if (groupId == null) {
-        if (group.containsKey('name')) groupId = group['name'];
-      }
 
-      List<dynamic> filtered = members;
-      if (groupId != null) {
-        filtered = members.where((m) {
-          if (m is Map) {
-            return m.values.any((v) => v == groupId);
-          }
-          return false;
-        }).toList();
-      }
+    try {
+      final groupId = widget.group['id'] as int;
+
+      final members = await _api.fetchGroupMembers(groupId);
 
       setState(() {
-        _members = filtered;
+        _members = members;
       });
     } catch (e) {
-      // ignore
+      print('[GroupDetail] Error loading members: $e');
     } finally {
       setState(() => _loading = false);
     }
@@ -56,34 +42,38 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.group['name'] ?? widget.group['id'] ?? 'Group';
+    final title =
+        widget.group['name'] ?? widget.group['id'] ?? 'Group';
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            final router = GoRouter.of(context);
-            if (router.canPop()) {
-              router.pop();
-            } else {
-              final encoded = Uri.encodeComponent(widget.username);
-              router.go('/groups?username=$encoded');
-            }
+            context.pop();
           },
         ),
         title: Text('$title'),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: CircularProgressIndicator(),
+            )
           : ListView.builder(
               itemCount: _members.length,
               itemBuilder: (context, idx) {
                 final m = _members[idx];
+
                 final display = (m is Map)
-                    ? (m['name'] ?? m['username'] ?? m['member_name'] ?? m.values.first.toString())
+                    ? (m['pseudo'] ??
+                        m['name'] ??
+                        m['username'] ??
+                        m['member_name'] ??
+                        m.values.first.toString())
                     : m.toString();
+
                 return ListTile(
-                  title: Text(display),
+                  title: Text(display.toString()),
                 );
               },
             ),
