@@ -4,6 +4,9 @@ import 'screens/login_page.dart';
 import 'screens/groups_page.dart';
 import 'screens/group_detail_page.dart';
 import 'screens/home_page.dart';
+import 'screens/games_page.dart';
+import 'screens/euromillions_page.dart';
+import 'screens/collect_euromillions_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -43,6 +46,21 @@ class MyApp extends StatelessWidget {
             final username = state.uri.queryParameters['username'] ?? '';
             return GroupDetailPage(group: group ?? {}, username: username);
           },
+        ),
+        GoRoute(
+          path: '/games',
+          builder: (context, state) => const GamesPage(),
+        ),
+
+        GoRoute(
+          path: '/euromillions',
+          builder: (context, state) =>
+              const EuromillionsPage(),
+        ),
+        GoRoute(
+          path: '/collect-euromillions',
+          builder: (context, state) =>
+              const CollectEuromillionsPage(),
         ),
       ],
     );

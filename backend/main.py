@@ -9,6 +9,10 @@ from database import engine
 from sqlalchemy import text
 
 from jwt import InvalidTokenError
+import asyncio
+from services.euromillions_scraper import (
+    scrape_latest_euromillions_draw,
+)
 
 # Configure logging BEFORE creating logger
 logging.basicConfig(
@@ -23,7 +27,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 logger.info(f'Backend initialized with SECRET_KEY: {SECRET_KEY[:10]}...')
 
 app = FastAPI()
-
+counter = 0
 
 # @app.get("/")
 # def home():
@@ -97,35 +101,6 @@ def get_all_from_table(table_name: str):
 
     return rows
 
-
-# def _get_user_id_from_token(authorization: Optional[str] = Header(None)):
-#     if not authorization:
-#         logger.warning('[auth] Missing authorization header')
-#         raise HTTPException(status_code=401, detail='Missing authorization')
-
-#     try:
-#         logger.info(f'[auth] Authorization header: {authorization[:50]}...')
-#         scheme, token = authorization.split()
-#         if scheme.lower() != 'bearer':
-#             logger.warning(f'[auth] Invalid auth scheme: {scheme}')
-#             raise HTTPException(status_code=401, detail='Invalid auth scheme')
-#         try:
-#             payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-#             logger.info(f'[auth] token decoded: sub={payload.get("sub")}')
-#         except Exception as e:
-#             logger.error(f'[auth] token decode error: {e}')
-#             raise
-#         user_id = payload.get('sub')
-#         if user_id is None:
-#             logger.warning('[auth] No sub claim in token')
-#             raise HTTPException(status_code=401, detail='Invalid token')
-#         logger.info(f'[auth] user_id extracted: {user_id}')
-#         return int(user_id)
-#     except HTTPException:
-#         raise
-#     except Exception as e:
-#         logger.error(f'[auth] Unexpected error: {e}')
-#         raise HTTPException(status_code=401, detail='Invalid token')
 
 def _get_user_id_from_token(
     authorization: Optional[str] = Header(None)
@@ -307,3 +282,178 @@ def get_split_rules():
 def get_users():
 
     return get_all_from_table("Users")
+
+# @app.get("/euromillions/draws")
+# def get_euromillions_draws():
+#     query = text("""
+#         SELECT
+#             id,
+#             draw_date,
+#             n1, n2, n3, n4, n5,
+#             e1, e2,
+#             jackpot,
+#             winners
+#         FROM "Draws"
+#         ORDER BY draw_date DESC
+#     """)
+
+#     with engine.connect() as conn:
+#         draws = conn.execute(query).mappings().all()
+
+#     return draws
+
+@app.get("/euromillions/draws")
+def get_euromillions_draws():
+    query = text("""
+        SELECT
+            id,
+            jour,
+            date,
+            numero_1, numero_2, numero_3, numero_4, numero_5,
+            etoile_1, etoile_2,
+            gagnants,
+            jackpot
+        FROM "Tirages"
+    """)
+
+    with engine.connect() as conn:
+        draws = conn.execute(query).mappings().all()
+
+    return draws
+
+@app.get("/euromillions/draws/{draw_id}/stats{nb_draws}")
+def get_draw_stats(draw_id: int):
+
+    query_previous = text("""
+        SELECT draw_date
+        FROM "Tirages"
+        WHERE id = :id
+    """)
+
+    with engine.connect() as conn:
+
+        current = conn.execute(
+            query_previous,
+            {"id": draw_id}
+        ).mappings().first()
+
+        if current is None:
+            raise HTTPException(404, "Draw not found")
+
+        query = text("""
+            SELECT n1,n2,n3,n4,n5
+            FROM "Tirages"
+            WHERE draw_date < :date
+            ORDER BY draw_date DESC
+            LIMIT 30
+        """)
+
+        rows = conn.execute(
+            query,
+            {"date": current["draw_date"]}
+        ).mappings().all()
+
+    counts = {i: 0 for i in range(1, 51)}
+
+    for row in rows:
+        for c in ["n1", "n2", "n3", "n4", "n5"]:
+            counts[row[c]] += 1
+
+    hot = sorted(
+        counts.items(),
+        key=lambda x: (-x[1], x[0])
+    )[:50]
+
+    cold = sorted(
+        counts.items(),
+        key=lambda x: (x[1], x[0])
+    )[:50]
+
+    return {
+        "hot": [
+            {"number": n, "count": c}
+            for n, c in hot
+        ],
+        "cold": [
+            {"number": n, "count": c}
+            for n, c in cold
+        ]
+    }
+
+@app.post("/euromillions/collect")
+async def collect_euromillions():
+    global counter
+
+    await asyncio.sleep(7)
+
+    message = f"message {counter}"
+    counter += 1
+
+    return {"message": message}
+
+from sqlalchemy.exc import IntegrityError
+
+@app.post("/collect/euromillions/latest")
+def collect_latest_euromillions():
+    try:
+        draw = scrape_latest_euromillions_draw()
+
+        query = text("""
+            INSERT INTO "Draws" (
+                draw_date,
+                n1,n2,n3,n4,n5,
+                e1,e2,
+                jackpot,
+                winners
+            )
+            VALUES (
+                :draw_date,
+                :n1,:n2,:n3,:n4,:n5,
+                :e1,:e2,
+                :jackpot,
+                :winners
+            )
+            RETURNING id
+        """)
+
+        with engine.begin() as conn:
+            draw_id = conn.execute(query, draw).scalar_one()
+
+        return {
+            "success": True,
+            "inserted": True,
+            "message": "Nouveau tirage ajouté.",
+            "draw_id": draw_id,
+            "draw": draw,
+        }
+
+    except IntegrityError:
+        return {
+            "success": True,
+            "inserted": False,
+            "message": "Ce tirage est déjà présent en base.",
+            "draw": draw,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
+
+    
+# @app.post("/collect/euromillions/latest")
+# def collect_latest_euromillions():
+#     try:
+#         draw = scrape_latest_euromillions_draw()
+
+#         return {
+#             "success": True,
+#             "draw": draw,
+#         }
+
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=str(e),
+#         )

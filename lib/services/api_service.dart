@@ -111,4 +111,39 @@ class ApiService {
     final data = resp.data as Map<String, dynamic>;
     return data['groups'] as List<dynamic>;
   }
+
+  Future<List<dynamic>> fetchEuromillionsDraws() async {
+    final resp = await _dio.get('/euromillions/draws');
+    return resp.data as List<dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fetchDrawStats(int drawId, int nbDraws) async {
+    final resp = await _dio.get(
+      '/euromillions/draws/$drawId/stats$nbDraws',
+    );
+    return Map<String, dynamic>.from(resp.data);
+  }
+
+  // Future<String> collectEuromillions() async {
+  //   final response = await _dio.post('/euromillions/collect');
+
+  //   return response.data['message'];
+  // }
+
+ Future<String> collectEuromillions() async {
+  final response = await _dio.post('/collect/euromillions/latest');
+
+  final draw = response.data['draw'];
+
+  final message = response.data['message'] as String;
+
+  return '$message\n\n'
+      '${draw['draw_date']} : \n'
+      '${draw['n1']} - ${draw['n2']} - ${draw['n3']} - ${draw['n4']} - ${draw['n5']}'
+      ' + '
+      '${draw['e1']} - ${draw['e2']}\n'
+      'Jackpot : ${draw['jackpot']} €\n'
+      'Gagnants : ${draw['winners']}';
+  }
+
 }

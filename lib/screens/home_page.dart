@@ -86,6 +86,10 @@ class _HomePageState extends State<HomePage> {
             );
             return;
           }
+          if (index == 2) {
+            context.push('/games');
+            return;
+          }
 
           setState(() {
             _currentIndex = index;
