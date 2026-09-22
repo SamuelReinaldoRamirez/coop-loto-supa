@@ -10,9 +10,19 @@ from sqlalchemy import text
 
 from jwt import InvalidTokenError
 import asyncio
+
+from datetime import date
+from pydantic import BaseModel
+
+
 from services.euromillions_scraper import (
     scrape_latest_euromillions_draw,
+    scrape_euromillions_period,
 )
+
+class CollectPeriodRequest(BaseModel):
+    start_date: date
+    end_date: date
 
 # Configure logging BEFORE creating logger
 logging.basicConfig(
@@ -29,18 +39,6 @@ logger.info(f'Backend initialized with SECRET_KEY: {SECRET_KEY[:10]}...')
 app = FastAPI()
 counter = 0
 
-# @app.get("/")
-# def home():
-#     return {
-#         "message": "Coop Loto API fonctionne"
-#     }
-
-
-# @app.get("/")
-# def test():
-#     return {
-#         "database": str(engine.url)
-#     }
 
 @app.get("/")
 def test():
@@ -283,37 +281,18 @@ def get_users():
 
     return get_all_from_table("Users")
 
-# @app.get("/euromillions/draws")
-# def get_euromillions_draws():
-#     query = text("""
-#         SELECT
-#             id,
-#             draw_date,
-#             n1, n2, n3, n4, n5,
-#             e1, e2,
-#             jackpot,
-#             winners
-#         FROM "Draws"
-#         ORDER BY draw_date DESC
-#     """)
-
-#     with engine.connect() as conn:
-#         draws = conn.execute(query).mappings().all()
-
-#     return draws
-
 @app.get("/euromillions/draws")
 def get_euromillions_draws():
     query = text("""
         SELECT
             id,
-            jour,
-            date,
-            numero_1, numero_2, numero_3, numero_4, numero_5,
-            etoile_1, etoile_2,
-            gagnants,
+            draw_date,
+            n1, n2, n3, n4, n5,
+            e1, e2,
+            winners,
             jackpot
-        FROM "Tirages"
+        FROM "Draws"
+        Order BY draw_date DESC
     """)
 
     with engine.connect() as conn:
@@ -440,20 +419,101 @@ def collect_latest_euromillions():
             status_code=500,
             detail=str(e),
         )
-
     
-# @app.post("/collect/euromillions/latest")
-# def collect_latest_euromillions():
-#     try:
-#         draw = scrape_latest_euromillions_draw()
 
-#         return {
-#             "success": True,
-#             "draw": draw,
-#         }
 
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=500,
-#             detail=str(e),
-#         )
+@app.get("/collect/euromillions/dates")
+def get_collected_euromillions_dates():
+    query = text("""
+        SELECT draw_date
+        FROM "Draws"
+        ORDER BY draw_date
+    """)
+
+    with engine.connect() as conn:
+        rows = conn.execute(query).scalars().all()
+
+    return [
+        draw_date.isoformat()
+        for draw_date in rows
+    ]
+
+
+@app.post("/collect/euromillions/period")
+def collect_euromillions_period(
+    body: CollectPeriodRequest,
+):
+    if body.start_date > body.end_date:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "La date de début doit être antérieure "
+                "ou égale à la date de fin."
+            ),
+        )
+
+    try:
+        draws = scrape_euromillions_period(
+            body.start_date,
+            body.end_date,
+        )
+
+        query = text("""
+            INSERT INTO "Draws" (
+                draw_date,
+                n1,
+                n2,
+                n3,
+                n4,
+                n5,
+                e1,
+                e2,
+                jackpot,
+                winners
+            )
+            VALUES (
+                :draw_date,
+                :n1,
+                :n2,
+                :n3,
+                :n4,
+                :n5,
+                :e1,
+                :e2,
+                :jackpot,
+                :winners
+            )
+            ON CONFLICT (draw_date) DO NOTHING
+        """)
+
+        inserted = 0
+        duplicates = 0
+
+        with engine.begin() as conn:
+            for draw in draws:
+                result = conn.execute(
+                    query,
+                    draw,
+                )
+
+                if result.rowcount == 1:
+                    inserted += 1
+                else:
+                    duplicates += 1
+
+        return {
+            "success": True,
+            "inserted": inserted,
+            "duplicates": duplicates,
+            "total": len(draws),
+            "message": (
+                f"{inserted} nouveau(x) tirage(s) ajouté(s), "
+                f"{duplicates} déjà présent(s)."
+            ),
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )

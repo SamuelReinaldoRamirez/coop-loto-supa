@@ -40,10 +40,10 @@ class _EuromillionsPageState
     });
   }
 
-
   Future<void> load() async {
-
     final data = await api.fetchEuromillionsDraws();
+
+    if (!mounted) return;
 
     setState(() {
       draws = data;
@@ -52,7 +52,6 @@ class _EuromillionsPageState
   }
 
   Widget ball(int n, Color c) {
-
     return CircleAvatar(
       radius: 16,
       backgroundColor: c,
@@ -65,11 +64,34 @@ class _EuromillionsPageState
     );
   }
 
+  String _formatJackpot(dynamic jackpot) {
+    final value = int.parse(jackpot.toString());
+
+    return value
+        .toString()
+        .replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ' ',
+        );
+  }
+
+  Color _getCardColor(dynamic winners) {
+    final count = int.parse(winners.toString());
+
+    if (count == 1) {
+      return const Color(0xFFD2B48C); // Ocre
+    }
+
+    if (count > 1) {
+      return const Color(0xFFF4CCCC); // Rouge pâle
+    }
+
+    return Colors.white;
+  }
+
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
       appBar: AppBar(
         title: const Text('Euromillions'),
         actions: [
@@ -90,21 +112,19 @@ class _EuromillionsPageState
           : ListView.builder(
               itemCount: draws.length,
               itemBuilder: (context, i) {
-
                 final d = draws[i];
 
                 return Card(
+                  color: _getCardColor(d['winners']),
                   child: ListTile(
-
                     title: Row(
                       children: [
-
                         for (final n in [
-                          d['numero_1'],
-                          d['numero_2'],
-                          d['numero_3'],
-                          d['numero_4'],
-                          d['numero_5'],
+                          d['n1'],
+                          d['n2'],
+                          d['n3'],
+                          d['n4'],
+                          d['n5'],
                         ])
                           Padding(
                             padding: const EdgeInsets.only(
@@ -115,41 +135,16 @@ class _EuromillionsPageState
 
                         const SizedBox(width: 8),
 
-                        ball(d['etoile_1'], Colors.orange),
+                        ball(d['e1'], Colors.orange),
                         const SizedBox(width: 4),
-                        ball(d['etoile_2'], Colors.orange),
+                        ball(d['e2'], Colors.orange),
                       ],
                     ),
 
-                    // title: Row(
-                    //   children: [
-
-                    //     for (final n in [
-                    //       d['n1'],
-                    //       d['n2'],
-                    //       d['n3'],
-                    //       d['n4'],
-                    //       d['n5'],
-                    //     ])
-                    //       Padding(
-                    //         padding: const EdgeInsets.only(
-                    //           right: 4,
-                    //         ),
-                    //         child: ball(n, Colors.blue),
-                    //       ),
-
-                    //     const SizedBox(width: 8),
-
-                    //     ball(d['e1'], Colors.orange),
-                    //     const SizedBox(width: 4),
-                    //     ball(d['e2'], Colors.orange),
-                    //   ],
-                    // ),
-
                     subtitle: Text(
-                      '${d['date']}\n'
-                      'Jackpot : ${d['jackpot']} €\n'
-                      'Gagnants : ${d['gagnants']}',
+                      '${d['draw_date']}\n'
+                      'Jackpot : ${_formatJackpot(d['jackpot'])} €\n'
+                      'Gagnants : ${d['winners']}',
                     ),
 
                     isThreeLine: true,

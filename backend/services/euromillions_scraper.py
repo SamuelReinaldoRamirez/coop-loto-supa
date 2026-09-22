@@ -1,19 +1,26 @@
 import re
-from datetime import datetime
+from datetime import date, datetime
 
 import requests
 from bs4 import BeautifulSoup
 
 
-EUROMILLIONS_URL = (
+BASE_URL = (
     "https://www.tirage-euromillions.net/"
-    "euromillions/annees/annee-2026/"
+    "euromillions/annees/annee-{year}/"
 )
 
 
-def scrape_latest_euromillions_draw():
+def _scrape_euromillions_year(year: int) -> list[dict]:
+    """
+    Récupère tous les tirages EuroMillions complets
+    disponibles pour une année donnée.
+    """
+
+    url = BASE_URL.format(year=year)
+
     response = requests.get(
-        EUROMILLIONS_URL,
+        url,
         timeout=10,
         headers={
             "User-Agent": (
@@ -29,45 +36,84 @@ def scrape_latest_euromillions_draw():
 
     soup = BeautifulSoup(response.text, "html.parser")
 
-    container = soup.find("div", id="multi-draws-by-year")
+    container = soup.find(
+        "div",
+        id="multi-draws-by-year",
+    )
+
     if container is None:
-        raise RuntimeError("Impossible de trouver le conteneur des tirages.")
+        raise RuntimeError(
+            f"Impossible de trouver le conteneur des tirages pour {year}."
+        )
 
     table = container.find("table")
+
     if table is None:
-        raise RuntimeError("Impossible de trouver le tableau des tirages.")
+        raise RuntimeError(
+            f"Impossible de trouver le tableau des tirages pour {year}."
+        )
 
     tbody = table.find("tbody")
+
     if tbody is None:
-        raise RuntimeError("Impossible de trouver le tbody du tableau.")
+        raise RuntimeError(
+            f"Impossible de trouver le tbody des tirages pour {year}."
+        )
 
     rows = tbody.find_all("tr")
+
+    draws = []
 
     for row in rows:
         cells = row.find_all("td")
 
-        # Ignore les lignes "Septembre 2026", etc.
+        # Ignore les lignes de séparation :
+        # "Septembre 2026", etc.
         if len(cells) != 4:
             continue
 
-        # -----------------------------
-        # Date : "Vendredi 18/09/2026"
-        # -> datetime.date(2026, 9, 18)
-        # -----------------------------
-        date_text = cells[0].get_text(" ", strip=True)
+        # ---------------------------------------------------------
+        # DATE
+        # ---------------------------------------------------------
+
+        date_text = cells[0].get_text(
+            " ",
+            strip=True,
+        )
+
+        # Exemple :
+        # "Vendredi 18/09/2026"
         date_str = date_text.split()[-1]
-        draw_date = datetime.strptime(
-            date_str,
-            "%d/%m/%Y",
-        ).date()
+
+        try:
+            draw_date = datetime.strptime(
+                date_str,
+                "%d/%m/%Y",
+            ).date()
+        except ValueError:
+            continue
+
+        # ---------------------------------------------------------
+        # NUMEROS + ETOILES
+        # ---------------------------------------------------------
 
         draw_cell = cells[1]
 
-        number_balls = draw_cell.find_all("span", class_="ball_small")
-        star_balls = draw_cell.find_all("span", class_="star_small")
+        number_balls = draw_cell.find_all(
+            "span",
+            class_="ball_small",
+        )
 
-        # Ignore les tirages non publiés
-        if len(number_balls) != 5 or len(star_balls) != 2:
+        star_balls = draw_cell.find_all(
+            "span",
+            class_="star_small",
+        )
+
+        # Le tirage n'est pas encore publié/complet.
+        if len(number_balls) != 5:
+            continue
+
+        if len(star_balls) != 2:
             continue
 
         numbers = [
@@ -80,147 +126,123 @@ def scrape_latest_euromillions_draw():
             for ball in star_balls
         ]
 
+        # Sécurité supplémentaire
         if len(numbers) != 5 or len(stars) != 2:
             continue
 
-        winners_text = cells[2].get_text(" ", strip=True)
-        jackpot_text = cells[3].get_text(" ", strip=True)
+        # ---------------------------------------------------------
+        # GAGNANTS
+        # ---------------------------------------------------------
 
-        # "0" -> 0
+        winners_text = cells[2].get_text(
+            " ",
+            strip=True,
+        )
+
         winners = int(
             re.sub(r"\D", "", winners_text) or "0"
         )
 
-        # "28 392 426 €" -> 28392426
-        jackpot = int(
-            re.sub(r"\D", "", jackpot_text)
+        # ---------------------------------------------------------
+        # JACKPOT
+        # ---------------------------------------------------------
+
+        jackpot_text = cells[3].get_text(
+            " ",
+            strip=True,
         )
 
-        return {
-            "draw_date": draw_date,
-            "n1": numbers[0],
-            "n2": numbers[1],
-            "n3": numbers[2],
-            "n4": numbers[3],
-            "n5": numbers[4],
-            "e1": stars[0],
-            "e2": stars[1],
-            "winners": winners,
-            "jackpot": jackpot,
-        }
+        jackpot_digits = re.sub(
+            r"\D",
+            "",
+            jackpot_text,
+        )
 
-    raise RuntimeError("Aucun tirage EuroMillions complet trouvé.")
+        if not jackpot_digits:
+            continue
 
-# def scrape_latest_euromillions_draw():
-#     response = requests.get(
-#         EUROMILLIONS_URL,
-#         timeout=10,
-#         headers={
-#             "User-Agent": (
-#                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-#                 "AppleWebKit/537.36 "
-#                 "(KHTML, like Gecko) "
-#                 "Chrome/140.0 Safari/537.36"
-#             )
-#         },
-#     )
+        jackpot = int(jackpot_digits)
 
-#     response.raise_for_status()
+        # ---------------------------------------------------------
+        # TIRAGE
+        # ---------------------------------------------------------
 
-#     soup = BeautifulSoup(response.text, "html.parser")
+        draws.append(
+            {
+                "draw_date": draw_date,
+                "n1": numbers[0],
+                "n2": numbers[1],
+                "n3": numbers[2],
+                "n4": numbers[3],
+                "n5": numbers[4],
+                "e1": stars[0],
+                "e2": stars[1],
+                "jackpot": jackpot,
+                "winners": winners,
+            }
+        )
 
-#     container = soup.find(
-#         "div",
-#         id="multi-draws-by-year",
-#     )
+    return draws
 
-#     if container is None:
-#         raise RuntimeError(
-#             "Impossible de trouver le conteneur des tirages."
-#         )
 
-#     table = container.find("table")
+def scrape_euromillions_period(
+    start_date: date,
+    end_date: date,
+) -> list[dict]:
+    """
+    Récupère les tirages EuroMillions compris
+    entre start_date et end_date inclus.
+    """
 
-#     if table is None:
-#         raise RuntimeError(
-#             "Impossible de trouver le tableau des tirages."
-#         )
+    if start_date > end_date:
+        raise ValueError(
+            "La date de début doit être antérieure "
+            "ou égale à la date de fin."
+        )
 
-#     tbody = table.find("tbody")
+    draws = []
 
-#     if tbody is None:
-#         raise RuntimeError(
-#             "Impossible de trouver le tbody du tableau."
-#         )
+    # Une année peut suffire ou la période peut traverser
+    # plusieurs années.
+    for year in range(
+        start_date.year,
+        end_date.year + 1,
+    ):
+        year_draws = _scrape_euromillions_year(year)
 
-#     rows = tbody.find_all("tr")
+        for draw in year_draws:
+            draw_date = draw["draw_date"]
 
-#     for row in rows:
-#         cells = row.find_all("td")
+            if start_date <= draw_date <= end_date:
+                draws.append(draw)
 
-#         # Les lignes contenant uniquement le nom du mois
-#         # ne sont pas des tirages.
-#         if len(cells) != 4:
-#             continue
+    # Tri chronologique
+    draws.sort(
+        key=lambda draw: draw["draw_date"]
+    )
 
-#         date_cell = cells[0]
-#         draw_cell = cells[1]
+    return draws
 
-#         # Récupération de la date
-#         date = date_cell.get_text(
-#             " ",
-#             strip=True,
-#         )
 
-#         # Récupération des boules
-#         number_balls = draw_cell.find_all(
-#             "span",
-#             class_="ball_small",
-#         )
+def scrape_latest_euromillions_draw():
+    """
+    Récupère le dernier tirage complet disponible.
+    """
 
-#         star_balls = draw_cell.find_all(
-#             "span",
-#             class_="star_small",
-#         )
+    draws = _scrape_euromillions_year(
+        date.today().year
+    )
 
-#         # Un tirage complet doit avoir :
-#         # 5 numéros + 2 étoiles
-#         if len(number_balls) != 5 or len(star_balls) != 2:
-#             continue
+    if not draws:
+        raise RuntimeError(
+            "Aucun tirage EuroMillions complet trouvé."
+        )
 
-#         numbers = [
-#             ball.get_text(strip=True)
-#             for ball in number_balls
-#         ]
+    # Le site est normalement déjà trié du plus récent
+    # au plus ancien, mais on ne dépend pas de cela.
+    draws.sort(
+        key=lambda draw: draw["draw_date"],
+        reverse=True,
+    )
 
-#         stars = [
-#             star.get_text(strip=True)
-#             for star in star_balls
-#         ]
-
-#         # Si les spans existent mais sont vides,
-#         # le tirage n'est pas encore disponible.
-#         if not all(numbers) or not all(stars):
-#             continue
-
-#         jackpot = cells[3].get_text(
-#             " ",
-#             strip=True,
-#         )
-
-#         winners = cells[2].get_text(
-#             " ",
-#             strip=True,
-#         )
-
-#         return {
-#             "date": date,
-#             "numbers": numbers,
-#             "stars": stars,
-#             "winners": winners,
-#             "jackpot": jackpot,
-#         }
-
-#     raise RuntimeError(
-#         "Aucun tirage EuroMillions complet trouvé."
-#     )
+    return draws[0]

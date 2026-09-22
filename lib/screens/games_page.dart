@@ -15,7 +15,8 @@ class GamesPage extends StatelessWidget {
       'Jeux téléphoniques',
       'Roulette',
       'Grattages',
-      'Trading - Cryptos, actions'
+      'Trading - Cryptos, actions',
+      'Paris, Lol, Polymarket, Poker, etc.',
     ];
 
     return Scaffold(

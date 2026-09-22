@@ -146,4 +146,41 @@ class ApiService {
       'Gagnants : ${draw['winners']}';
   }
 
+
+  Future<List<DateTime>> fetchCollectedEuromillionsDates() async {
+    final response = await _dio.get(
+      '/collect/euromillions/dates',
+    );
+
+    final dates = response.data as List;
+
+    return dates.map((date) {
+      return DateTime.parse(date as String);
+    }).toList();
+  }
+
+
+  Future<String> collectEuromillionsPeriod(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final response = await _dio.post(
+      '/collect/euromillions/period',
+      data: {
+        'start_date': _formatDateForApi(startDate),
+        'end_date': _formatDateForApi(endDate),
+      },
+    );
+
+    final data = response.data;
+
+    return data['message'] as String;
+  }
+
+  String _formatDateForApi(DateTime date) {
+    return '${date.year.toString().padLeft(4, '0')}-'
+        '${date.month.toString().padLeft(2, '0')}-'
+        '${date.day.toString().padLeft(2, '0')}';
+  }
+
 }

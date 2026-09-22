@@ -7,8 +7,11 @@ import 'screens/home_page.dart';
 import 'screens/games_page.dart';
 import 'screens/euromillions_page.dart';
 import 'screens/collect_euromillions_page.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('fr_FR');
   runApp(const MyApp());
 }
 
