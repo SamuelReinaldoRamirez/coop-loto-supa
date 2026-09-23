@@ -15,6 +15,9 @@ user :
 user0
 aaaaaa
 
+adminsam
+aaaaaa
+
 lancer les tests :
 flutter test integration_test/navigation_test.dart
 
