@@ -183,4 +183,31 @@ class ApiService {
         '${date.day.toString().padLeft(2, '0')}';
   }
 
+  // Future<Map<String, dynamic>> fetchEuromillionsStats(
+  //   int drawId,
+  // ) async {
+  //   final response = await _dio.get(
+  //     '/euromillions/draws/$drawId/stats',
+  //   );
+
+  //   return response.data as Map<String, dynamic>;
+  // }
+
+  Future<Map<String, dynamic>> fetchCurrentEuromillionsStats() async {
+    final response = await _dio.get(
+      '/euromillions/stats/current',
+    );
+
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> fetchAllEuromillionsStats(
+  ) async {
+    final response = await _dio.get(
+      '/euromillions/stats',
+    );
+
+    return response.data as Map<String, dynamic>;
+  }
+
 }
