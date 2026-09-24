@@ -46,11 +46,32 @@ class ApiService {
 
   factory ApiService() => _instance;
 
+
   static String _computeBaseUrl() {
-    // Android emulator uses 10.0.2.2 to reach host machine
-    if (Platform.isAndroid) return 'http://10.0.2.2:8000';
-    return 'http://127.0.0.1:8000';
+    const bool railwayOrLocal = false; //true for railway, false for local
+    const baseUrl = 'https://backendcooploto-production.up.railway.app';
+    if(railwayOrLocal){
+      print('[Api] Using Railway base URL: $baseUrl');
+      return baseUrl;
+    }else{
+      if (Platform.isAndroid) {
+        print('[Api] Using Android emulator base URL: http://10.0.2.2:8000');
+        return 'http://10.0.2.2:8000';
+      }
+      print('[Api] Using default base URL: http://127.0.0.1:8000');
+      return 'http://127.0.0.1:8000';
+    }
   }
+
+  // static String _computeBaseUrl() {
+  //   // Android emulator uses 10.0.2.2 to reach host machine
+  //   if (Platform.isAndroid) {
+  //     print('[Api] Using Android emulator base URL: http://10.0.2.2:8000');
+  //     return 'http://10.0.2.2:8000';
+  //   }
+  //   print('[Api] Using default base URL: http://127.0.0.1:8000');
+  //   return 'http://127.0.0.1:8000';
+  // }
 
   Future<Map<String, dynamic>> fetchMe() async {
   print('[Api] fetchMe -> GET /me');
