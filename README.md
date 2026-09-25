@@ -21,6 +21,13 @@ aaaaaa
 lancer les tests :
 flutter test integration_test/navigation_test.dart
 
+dans li/services/api_service.dart, on choisit le back à questionner : 
+
+static String _computeBaseUrl() {
+    const bool railwayOrLocal = false; //true for railway, false for local
+    const baseUrl = 'https://backendcooploto-production.up.railway.app';
+    ...
+
 A new Flutter project.
 
 ## Getting Started
