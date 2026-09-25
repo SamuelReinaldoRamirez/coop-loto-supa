@@ -10,13 +10,15 @@ String formatJackpot(dynamic jackpot) {
   );
 }
 
-String getDrawDay(dynamic drawDate) {
+String formatDrawDate(dynamic drawDate) {
   final date = DateTime.parse(drawDate.toString());
 
-  return DateFormat(
-    'EEEE',
+  final formatted = DateFormat(
+    'EEEE d MMMM y',
     'fr_FR',
   ).format(date);
+
+  return formatted[0].toUpperCase() + formatted.substring(1);
 }
 
 Color getCardColor(dynamic winners) {
@@ -30,20 +32,8 @@ Color getCardColor(dynamic winners) {
     return const Color(0xFFF4CCCC);
   }
 
-  return Colors.grey.shade500;
+  return Colors.white;
 }
-
-// -----------------------------------------------------
-// Couleur du numéro
-//
-// Hot   -> rouge
-// Cold  -> bleu
-// Retard seul -> blanc
-// Normal -> blanc
-//
-// IMPORTANT : le retard ne change PAS la couleur
-// du numéro. Il est géré séparément par la bordure.
-// -----------------------------------------------------
 
 Color getNumberColor(
   dynamic number,
@@ -55,31 +45,18 @@ Color getNumberColor(
   final cold = (drawStats['cold'] as List?) ?? [];
 
   final isHot = hot.any(
-    (item) =>
-        int.parse(item['number'].toString()) == numberValue,
+    (item) => int.parse(item['number'].toString()) == numberValue,
   );
 
   final isCold = cold.any(
-    (item) =>
-        int.parse(item['number'].toString()) == numberValue,
+    (item) => int.parse(item['number'].toString()) == numberValue,
   );
 
-  // Hot est prioritaire si jamais les listes
-  // présentent un chevauchement.
-  if (isHot) {
-    return Colors.red;
-  }
-
-  if (isCold) {
-    return Colors.blue.shade900;
-  }
+  if (isHot) return Colors.red;
+  if (isCold) return Colors.blue.shade900;
 
   return Colors.white;
 }
-
-// -----------------------------------------------------
-// Est-ce que le numéro est en retard ?
-// -----------------------------------------------------
 
 bool isNumberOverdue(
   dynamic number,
@@ -87,11 +64,9 @@ bool isNumberOverdue(
 ) {
   final numberValue = int.parse(number.toString());
 
-  final overdue =
-      (drawStats['overdue'] as List?) ?? [];
+  final overdue = (drawStats['overdue'] as List?) ?? [];
 
   return overdue.any(
-    (item) =>
-        int.parse(item['number'].toString()) == numberValue,
+    (item) => int.parse(item['number'].toString()) == numberValue,
   );
 }
