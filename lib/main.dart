@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'screens/login_page.dart';
 import 'screens/groups_page.dart';
-import 'screens/group_detail_page.dart';
+import 'screens/group_menu_page.dart';
 import 'screens/home_page.dart';
 import 'screens/games_page.dart';
 import 'screens/euromillions_page.dart';
 import 'screens/collect_euromillions_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'screens/buy_credits_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -43,11 +44,16 @@ class MyApp extends StatelessWidget {
           },
         ),
         GoRoute(
-          path: '/group/:id',
+          path: '/group/:groupId/menu',
           builder: (context, state) {
-            final group = state.extra as Map<String, dynamic>?;
-            final username = state.uri.queryParameters['username'] ?? '';
-            return GroupDetailPage(group: group ?? {}, username: username);
+            final group = state.extra as Map<String, dynamic>;
+            final username =
+                state.uri.queryParameters['username'] ?? '';
+
+            return GroupMenuPage(
+              group: group,
+              username: username,
+            );
           },
         ),
         GoRoute(
@@ -64,6 +70,12 @@ class MyApp extends StatelessWidget {
           path: '/collect-euromillions',
           builder: (context, state) =>
               const CollectEuromillionsPage(),
+        ),
+        GoRoute(
+          path: '/buy-credits',
+          builder: (context, state) {
+            return const BuyCreditsPage();
+          },
         ),
       ],
     );

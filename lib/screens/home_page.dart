@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../services/auth_service.dart';
+import '../services/api_service.dart';
 
 class HomePage extends StatefulWidget {
   final String username;
@@ -19,6 +20,10 @@ class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
   final AuthService _auth = AuthService();
+  final ApiService _api = ApiService();
+
+  int _credits = 0;
+  bool _loadingCredits = true;
 
   final List<String> _titles = [
     'Mes groupes',
@@ -27,6 +32,33 @@ class _HomePageState extends State<HomePage> {
     'Statistiques',
     'Inviter',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCredits();
+  }
+
+  Future<void> _loadCredits() async {
+    try {
+      final user = await _api.fetchMe();
+
+      if (!mounted) return;
+
+      setState(() {
+        _credits = user['credits'] ?? 0;
+        _loadingCredits = false;
+      });
+    } catch (e) {
+      print('[Home] Error loading credits: $e');
+
+      if (!mounted) return;
+
+      setState(() {
+        _loadingCredits = false;
+      });
+    }
+  }
 
   Future<void> _logout() async {
     print('[Home] Déconnexion...');
@@ -41,13 +73,84 @@ class _HomePageState extends State<HomePage> {
     context.go('/');
   }
 
+  void _buyCredits() {
+    context.push('/buy-credits');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Coop Loto ${widget.username}'),
+        title: Text(
+          'Coop Loto ${widget.username}',
+        ),
         centerTitle: true,
+
         actions: [
+
+          // =========================
+          // CRÉDITS
+          // =========================
+
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: _buyCredits,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .primary
+                      .withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+
+                    const Icon(
+                      Icons.credit_card,
+                      size: 20,
+                    ),
+
+                    const SizedBox(width: 5),
+
+                    _loadingCredits
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            '$_credits',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+
+                    const SizedBox(width: 2),
+
+                    const Icon(
+                      Icons.add_circle_outline,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // =========================
+          // SETTINGS
+          // =========================
+
           PopupMenuButton<String>(
             icon: const Icon(Icons.settings),
             onSelected: (value) async {
@@ -78,6 +181,7 @@ class _HomePageState extends State<HomePage> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         type: BottomNavigationBarType.fixed,
+
         onTap: (index) {
           if (index == 0) {
             context.go(
@@ -86,6 +190,7 @@ class _HomePageState extends State<HomePage> {
             );
             return;
           }
+
           if (index == 2) {
             context.push('/games');
             return;
@@ -95,6 +200,7 @@ class _HomePageState extends State<HomePage> {
             _currentIndex = index;
           });
         },
+
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.group),

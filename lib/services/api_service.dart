@@ -79,7 +79,7 @@ class ApiService {
   final resp = await _dio.get('/me');
 
   print('[Api] fetchMe status=${resp.statusCode}');
-
+  print(resp.data);
   return Map<String, dynamic>.from(resp.data as Map);
 }
 
