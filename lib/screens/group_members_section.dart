@@ -17,7 +17,8 @@ class GroupMembersSection extends StatefulWidget {
 }
 
 class _GroupMembersSectionState
-    extends State<GroupMembersSection> {
+    extends State<GroupMembersSection>
+    with AutomaticKeepAliveClientMixin<GroupMembersSection> {
 
   final ApiService _api = ApiService();
 
@@ -25,9 +26,28 @@ class _GroupMembersSectionState
   List<dynamic> _members = [];
 
   @override
+  bool get wantKeepAlive => true;
+
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _loadMembers();
+  // }
+
+  @override
   void initState() {
     super.initState();
+
+    print('🟢 GroupMembersSection INIT');
+
     _loadMembers();
+  }
+
+  @override
+  void dispose() {
+    print('🔴 GroupMembersSection DISPOSE');
+
+    super.dispose();
   }
 
   Future<void> _loadMembers() async {
@@ -53,6 +73,7 @@ class _GroupMembersSectionState
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (_loading) {
       return const Center(
         child: Padding(

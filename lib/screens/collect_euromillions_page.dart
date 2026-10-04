@@ -70,17 +70,6 @@ final Set<DateTime> _collectedDates = {};
     setState(() {});
   }
 
-
-  // Future<void> _waitForCollect() async {
-  //   try {
-  //     await _collect.collect();
-  //   } catch (_) {}
-
-  //   if (!mounted) return;
-
-  //   setState(() {});
-  // }
-
   Future<void> _startCollect() async {
     setState(() {});
 
@@ -116,20 +105,6 @@ final Set<DateTime> _collectedDates = {};
 
     setState(() {});
   }
-
-
-
-  // Future<void> _startCollect() async {
-  //   setState(() {});
-
-  //   try {
-  //     await _collect.collect();
-  //   } catch (_) {}
-
-  //   if (!mounted) return;
-
-  //   setState(() {});
-  // }
 
   String get _periodeLabel {
     if (_startDate == null) {
