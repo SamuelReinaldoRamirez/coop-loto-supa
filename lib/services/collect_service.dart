@@ -53,22 +53,4 @@ class CollectService {
     return _runningFuture!;
   }
 
-  // Future<String> collect() {
-  //   if (_runningFuture != null) {
-  //     return _runningFuture!;
-  //   }
-
-  //   isCollecting = true;
-  //   lastMessage = null;
-
-  //   _runningFuture = _api.collectEuromillions().then((message) {
-  //     lastMessage = message;
-  //     return message;
-  //   }).whenComplete(() {
-  //     isCollecting = false;
-  //     _runningFuture = null;
-  //   });
-
-  //   return _runningFuture!;
-  // }
 }
