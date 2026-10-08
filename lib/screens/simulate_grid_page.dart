@@ -27,9 +27,9 @@ class SimulateGridPage extends StatefulWidget {
       _SimulateGridPageState();
 }
 
-class _SimulateGridPageState extends State<SimulateGridPage> {
+class _SimulateGridPageState
+    extends State<SimulateGridPage> {
   final Random _random = Random();
-
   final ApiService _apiService = ApiService();
 
   // ============================================================
@@ -45,9 +45,22 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   // PARAMÈTRES D'ANALYSE
   // ============================================================
 
+  // Slider noir :
+  // nombre de derniers tirages utilisés pour calculer
+  // la valeur Hot/Cold.
   double _drawHistoryCount = 30;
+
+  // Slider rouge :
+  // nombre de numéros HOT à mettre en évidence.
   double _hotCount = 10;
+
+  // Slider bleu :
+  // nombre de numéros COLD à mettre en évidence.
   double _coldCount = 10;
+
+  // Slider jaune :
+  // nombre de numéros les plus en retard à mettre
+  // en évidence.
   double _overdueCount = 10;
 
   // ============================================================
@@ -66,12 +79,22 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   // STATISTIQUES CALCULÉES
   // ============================================================
 
+  // Nombre d'apparitions sur les X derniers tirages.
+  //
+  // IMPORTANT :
+  // cette valeur correspond maintenant directement
+  // à la valeur Hot/Cold affichée sur chaque numéro.
   Map<int, int> _appearances = {};
+
+  // Nombre de tirages depuis la dernière apparition.
+  //
+  // Cette valeur est indépendante du slider jaune.
   Map<int, int> _overdue = {};
 
-  // Pour le moment conservé pour ton affichage existant.
-  // On pourra ensuite le calculer réellement à partir
-  // des grilles du groupe.
+  // Nombre de fois où le numéro a été joué par le groupe.
+  //
+  // Pour le moment MOCK :
+  // tous les numéros valent 5.
   Map<int, int> _groupGridCount = {};
 
   // ============================================================
@@ -259,6 +282,14 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
       return;
     }
 
+    // ==========================================================
+    // X = NOMBRE DE DERNIERS TIRAGES
+    //
+    // Ce X est uniquement déterminé par le slider noir.
+    //
+    // Il sert à calculer la valeur Hot/Cold.
+    // ==========================================================
+
     final selectedDrawCount =
         _selectedDrawHistoryCount.clamp(
       1,
@@ -266,7 +297,8 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     );
 
     // ==========================================================
-    // ON PREND LES N DERNIERS TIRAGES
+    // ON PREND LES X DERNIERS TIRAGES
+    //
     // _draws est déjà trié du plus récent au plus ancien.
     // ==========================================================
 
@@ -276,7 +308,19 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
             .toList();
 
     // ==========================================================
-    // APPARITIONS
+    // HOT / COLD
+    //
+    // Pour chaque numéro :
+    //
+    // valeur = nombre de tirages parmi les X derniers
+    // tirages dans lesquels le numéro est apparu.
+    //
+    // Exemple :
+    //
+    // slider noir = 30
+    // numéro 17 apparaît dans 8 des 30 derniers tirages
+    //
+    // => valeur Hot/Cold du 17 = 8
     // ==========================================================
 
     final appearances =
@@ -300,13 +344,24 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     // ==========================================================
     // RETARD
     //
-    // Le tirage le plus récent = index 0
+    // IMPORTANT :
+    //
+    // Le retard est calculé indépendamment du slider jaune.
+    //
+    // Le slider noir définit uniquement la fenêtre de tirages
+    // analysée pour Hot/Cold.
+    //
+    // Le retard cherche la dernière apparition du numéro
+    // dans les tirages disponibles.
+    //
+    // Tirage le plus récent = index 0
     //
     // présent au dernier tirage -> retard 0
     // présent au tirage précédent -> retard 1
     // etc.
     //
-    // jamais présent dans la fenêtre -> retard = N
+    // Si le numéro n'est jamais retrouvé dans les tirages
+    // disponibles, on utilise _draws.length.
     // ==========================================================
 
     final overdue =
@@ -315,15 +370,14 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     for (int number = 1;
         number <= 50;
         number++) {
-      int delay =
-          selectedDrawCount;
+      int delay = _draws.length;
 
       for (int index = 0;
-          index < recentDraws.length;
+          index < _draws.length;
           index++) {
         final numbers =
             _extractMainNumbers(
-          recentDraws[index],
+          _draws[index],
         );
 
         if (numbers.contains(number)) {
@@ -338,8 +392,8 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     // ==========================================================
     // GROUP GRID COUNT
     //
-    // On conserve ici tes valeurs actuelles.
-    // Elles ne dépendent pas encore des tirages EuroMillions.
+    // MOCK POUR LE MOMENT :
+    // chaque numéro a une valeur de 5.
     // ==========================================================
 
     final groupGridCount =
@@ -347,9 +401,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
       for (int number = 1;
           number <= 50;
           number++)
-        number:
-            _groupGridCount[number] ??
-                0,
+        number: 5,
     };
 
     // ==========================================================
@@ -363,14 +415,13 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     setState(() {
       _appearances = appearances;
       _overdue = overdue;
-      _groupGridCount =
-          groupGridCount;
+      _groupGridCount = groupGridCount;
     });
 
     print(
       '[SimulateGridPage] '
       'Statistiques recalculées : '
-      '$selectedDrawCount tirages',
+      '$selectedDrawCount derniers tirages',
     );
   }
 
@@ -379,14 +430,17 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   // ============================================================
 
   void _generateInitialGroupStatistics() {
-    _groupGridCount = {};
+    // ==========================================================
+    // MOCK :
+    // tous les numéros ont été joués 5 fois par le groupe.
+    // ==========================================================
 
-    for (int number = 1;
-        number <= 50;
-        number++) {
-      _groupGridCount[number] =
-          _random.nextInt(16);
-    }
+    _groupGridCount = {
+      for (int number = 1;
+          number <= 50;
+          number++)
+        number: 5,
+    };
 
     _appearances = {
       for (int number = 1;
@@ -421,11 +475,13 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
   // ============================================================
   // NUMÉROS HOT
+  //
+  // Les plus grandes valeurs Hot/Cold sont les HOT.
   // ============================================================
 
   List<int> get _hotNumbers {
     final numbers =
-        List<int>.generate(
+        List.generate(
       50,
       (index) => index + 1,
     );
@@ -458,11 +514,13 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
   // ============================================================
   // NUMÉROS COLD
+  //
+  // Les plus petites valeurs Hot/Cold sont les COLD.
   // ============================================================
 
   List<int> get _coldNumbers {
     final numbers =
-        List<int>.generate(
+        List.generate(
       50,
       (index) => index + 1,
     );
@@ -495,11 +553,16 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
   // ============================================================
   // NUMÉROS EN RETARD
+  //
+  // Les plus grandes valeurs de retard sont les plus en retard.
+  //
+  // Le slider jaune ne modifie PAS le calcul du retard.
+  // Il indique uniquement combien de numéros sont surlignés.
   // ============================================================
 
   List<int> get _overdueNumbers {
     final numbers =
-        List<int>.generate(
+        List.generate(
       50,
       (index) => index + 1,
     );
@@ -590,9 +653,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   // ============================================================
 
   @override
-  Widget build(
-    BuildContext context,
-  ) {
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor:
           const Color(0xFFF5F6FA),
@@ -797,8 +858,8 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
             ),
 
             Text(
-              'Les statistiques affichées sur chaque numéro '
-              'dépendent des paramètres ci-dessus.',
+              'Chaque numéro affiche le nombre de grilles du groupe, '
+              'son retard et sa fréquence Hot/Cold.',
               style: TextStyle(
                 fontSize: 12,
                 color:
@@ -812,10 +873,6 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
             // ==================================================
             // LES 50 NUMÉROS
-            //
-            // IMPORTANT :
-            // appearances et overdue sont maintenant calculés
-            // à partir des vrais tirages.
             // ==================================================
 
             SimulationNumberGrid(
@@ -879,8 +936,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
                 onPressed:
                     _generateGrid,
                 icon: const Icon(
-                  Icons
-                      .auto_awesome_rounded,
+                  Icons.auto_awesome_rounded,
                 ),
                 label: const Text(
                   'Générer cette grille',
