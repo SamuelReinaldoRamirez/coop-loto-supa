@@ -133,34 +133,6 @@ class ApiService {
     return data['groups'] as List<dynamic>;
   }
 
-  Future<int> fetchEuromillionsDrawsCount() async {
-    print(
-      '[Api] fetchEuromillionsDrawsCount -> '
-      'GET /euromillions/draws/count',
-    );
-
-    final resp = await _dio.get(
-      '/euromillions/draws/count',
-    );
-
-    print(
-      '[Api] fetchEuromillionsDrawsCount '
-      'status=${resp.statusCode}',
-    );
-
-    final data =
-        Map<String, dynamic>.from(resp.data as Map);
-
-    final count = (data['count'] as num).toInt();
-
-    print(
-      '[Api] fetchEuromillionsDrawsCount '
-      'count=$count',
-    );
-
-    return count;
-  }
-
   Future<List<dynamic>> fetchEuromillionsDraws() async {
     final resp = await _dio.get('/euromillions/draws');
     return resp.data as List<dynamic>;
