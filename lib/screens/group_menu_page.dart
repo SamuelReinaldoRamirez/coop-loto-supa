@@ -60,7 +60,7 @@ class GroupMenuPage extends StatelessWidget {
             icon: Icons.shopping_cart_rounded,
             title: 'Acheter des grilles',
             subtitle:
-                'Acheter des grilles pour ce groupe',
+                'Acheter des grilles en batch pour ce groupe',
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -90,7 +90,7 @@ class GroupMenuPage extends StatelessWidget {
 
           GroupMenuActionCard(
             icon: Icons.auto_awesome_rounded,
-            title: 'Simuler une nouvelle grille',
+            title: 'Nouvelle grille',
             subtitle:
                 'Analyser les numéros, retards, fréquences et combinaisons',
             onTap: () {

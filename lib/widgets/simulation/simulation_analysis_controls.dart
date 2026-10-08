@@ -1,20 +1,32 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
-class SimulationAnalysisControls extends StatelessWidget {
+class SimulationAnalysisControls
+    extends StatelessWidget {
   final double drawHistoryCount;
   final double hotCount;
   final double coldCount;
   final double overdueCount;
+
+  final int drawHistoryMax;
 
   final int selectedDrawHistoryCount;
   final int selectedHotCount;
   final int selectedColdCount;
   final int selectedOverdueCount;
 
-  final ValueChanged<double> onDrawHistoryChanged;
-  final ValueChanged<double> onHotChanged;
-  final ValueChanged<double> onColdChanged;
-  final ValueChanged<double> onOverdueChanged;
+  final ValueChanged<double>
+      onDrawHistoryChanged;
+
+  final ValueChanged<double>
+      onHotChanged;
+
+  final ValueChanged<double>
+      onColdChanged;
+
+  final ValueChanged<double>
+      onOverdueChanged;
 
   const SimulationAnalysisControls({
     super.key,
@@ -22,6 +34,7 @@ class SimulationAnalysisControls extends StatelessWidget {
     required this.hotCount,
     required this.coldCount,
     required this.overdueCount,
+    required this.drawHistoryMax,
     required this.selectedDrawHistoryCount,
     required this.selectedHotCount,
     required this.selectedColdCount,
@@ -32,16 +45,87 @@ class SimulationAnalysisControls extends StatelessWidget {
     required this.onOverdueChanged,
   });
 
+  // ============================================================
+  // CONVERSION LOGARITHMIQUE
+  // ============================================================
+
+  double _drawCountToSliderValue(
+    int count,
+  ) {
+    final maxValue =
+        max(1, drawHistoryMax)
+            .toDouble();
+
+    if (maxValue <= 1) {
+      return 0;
+    }
+
+    final safeCount =
+        count.clamp(
+      1,
+      drawHistoryMax,
+    );
+
+    final minLog = log(1.0);
+    final maxLog = log(maxValue);
+    final valueLog =
+        log(safeCount.toDouble());
+
+    return (valueLog - minLog) /
+        (maxLog - minLog);
+  }
+
+  int _sliderValueToDrawCount(
+    double value,
+  ) {
+    final maxValue =
+        max(1, drawHistoryMax)
+            .toDouble();
+
+    if (maxValue <= 1) {
+      return 1;
+    }
+
+    final minLog = log(1.0);
+    final maxLog = log(maxValue);
+
+    final clampedValue =
+        value.clamp(0.0, 1.0);
+
+    final valueLog =
+        minLog +
+        clampedValue *
+            (maxLog - minLog);
+
+    final count =
+        exp(valueLog).round();
+
+    return count.clamp(
+      1,
+      drawHistoryMax,
+    );
+  }
+
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Card(
       elevation: 1,
-      shadowColor: Colors.black.withOpacity(0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+      shadowColor:
+          Colors.black.withOpacity(0.08),
+      shape:
+          RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.circular(14),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding:
+            const EdgeInsets.fromLTRB(
           14,
           12,
           14,
@@ -51,21 +135,28 @@ class SimulationAnalysisControls extends StatelessWidget {
           crossAxisAlignment:
               CrossAxisAlignment.start,
           children: [
+            // ==================================================
+            // TITRE
+            // ==================================================
+
             Row(
               children: [
                 Icon(
                   Icons.tune_rounded,
                   size: 20,
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary,
+                  color:
+                      Theme.of(context)
+                          .colorScheme
+                          .primary,
                 ),
                 const SizedBox(width: 8),
                 const Text(
                   'Paramètres d’analyse',
-                  style: TextStyle(
+                  style:
+                      TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.bold,
+                    fontWeight:
+                        FontWeight.bold,
                   ),
                 ),
               ],
@@ -73,58 +164,109 @@ class SimulationAnalysisControls extends StatelessWidget {
 
             const SizedBox(height: 10),
 
+            // ==================================================
+            // DERNIERS TIRAGES
+            // ==================================================
+
             _buildSlider(
               context,
               title: 'Derniers tirages',
-              value: drawHistoryCount,
-              min: 5,
-              max: 100,
-              divisions: 19,
+              value:
+                  _drawCountToSliderValue(
+                selectedDrawHistoryCount,
+              ),
+              min: 0,
+              max: 1,
+              divisions: null,
               color: Colors.black87,
               valueLabel:
                   '$selectedDrawHistoryCount',
-              onChanged: onDrawHistoryChanged,
+              onChanged: (value) {
+                final count =
+                    _sliderValueToDrawCount(
+                  value,
+                );
+
+                onDrawHistoryChanged(
+                  count.toDouble(),
+                );
+              },
             ),
+
+            // ==================================================
+            // HOT
+            // ==================================================
 
             _buildSlider(
               context,
               title: 'Hot numbers',
-              value: hotCount,
-              min: 0,
-              max: 20,
-              divisions: 20,
+              value:
+                  hotCount.clamp(
+                1,
+                50,
+              ),
+              min: 1,
+              max: 50,
+              divisions: 49,
               color: Colors.red,
-              valueLabel: '$selectedHotCount',
-              onChanged: onHotChanged,
+              valueLabel:
+                  '$selectedHotCount',
+              onChanged:
+                  onHotChanged,
             ),
+
+            // ==================================================
+            // COLD
+            // ==================================================
 
             _buildSlider(
               context,
               title: 'Cold numbers',
-              value: coldCount,
-              min: 0,
-              max: 20,
-              divisions: 20,
-              color: Colors.blue.shade700,
+              value:
+                  coldCount.clamp(
+                1,
+                50,
+              ),
+              min: 1,
+              max: 50,
+              divisions: 49,
+              color:
+                  Colors.blue.shade700,
               valueLabel:
                   '$selectedColdCount',
-              onChanged: onColdChanged,
+              onChanged:
+                  onColdChanged,
             ),
+
+            // ==================================================
+            // RETARD
+            // ==================================================
 
             _buildSlider(
               context,
-              title: 'Numéros en retard',
-              value: overdueCount,
-              min: 0,
-              max: 20,
-              divisions: 20,
-              color: Colors.amber.shade800,
+              title:
+                  'Numéros en retard',
+              value:
+                  overdueCount.clamp(
+                1,
+                50,
+              ),
+              min: 1,
+              max: 50,
+              divisions: 49,
+              color:
+                  Colors.amber.shade800,
               valueLabel:
                   '$selectedOverdueCount',
-              onChanged: onOverdueChanged,
+              onChanged:
+                  onOverdueChanged,
             ),
 
             const SizedBox(height: 4),
+
+            // ==================================================
+            // RÉSUMÉ
+            // ==================================================
 
             Wrap(
               spacing: 8,
@@ -136,12 +278,14 @@ class SimulationAnalysisControls extends StatelessWidget {
                       '$selectedHotCount Hot',
                 ),
                 _buildAnalysisChip(
-                  color: Colors.blue.shade700,
+                  color:
+                      Colors.blue.shade700,
                   label:
                       '$selectedColdCount Cold',
                 ),
                 _buildAnalysisChip(
-                  color: Colors.amber.shade800,
+                  color:
+                      Colors.amber.shade800,
                   label:
                       '$selectedOverdueCount retard',
                 ),
@@ -153,16 +297,21 @@ class SimulationAnalysisControls extends StatelessWidget {
     );
   }
 
+  // ============================================================
+  // SLIDER
+  // ============================================================
+
   Widget _buildSlider(
     BuildContext context, {
     required String title,
     required double value,
     required double min,
     required double max,
-    required int divisions,
+    required int? divisions,
     required Color color,
     required String valueLabel,
-    required ValueChanged<double> onChanged,
+    required ValueChanged<double>
+        onChanged,
   }) {
     return Column(
       children: [
@@ -171,29 +320,41 @@ class SimulationAnalysisControls extends StatelessWidget {
             Expanded(
               child: Text(
                 title,
-                style: const TextStyle(
+                style:
+                    const TextStyle(
                   fontSize: 12.5,
-                  fontWeight: FontWeight.w600,
+                  fontWeight:
+                      FontWeight.w600,
                 ),
               ),
             ),
             Container(
               width: 42,
-              alignment: Alignment.center,
+              alignment:
+                  Alignment.center,
               padding:
-                  const EdgeInsets.symmetric(
+                  const EdgeInsets
+                      .symmetric(
                 vertical: 3,
               ),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.08),
+              decoration:
+                  BoxDecoration(
+                color:
+                    color.withOpacity(
+                  0.08,
+                ),
                 borderRadius:
-                    BorderRadius.circular(6),
+                    BorderRadius.circular(
+                  6,
+                ),
               ),
               child: Text(
                 valueLabel,
-                style: TextStyle(
+                style:
+                    TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.bold,
+                  fontWeight:
+                      FontWeight.bold,
                   color: color,
                 ),
               ),
@@ -204,11 +365,18 @@ class SimulationAnalysisControls extends StatelessWidget {
         SizedBox(
           height: 30,
           child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: color,
-              thumbColor: color,
+            data:
+                SliderTheme.of(
+              context,
+            ).copyWith(
+              activeTrackColor:
+                  color,
+              thumbColor:
+                  color,
               overlayColor:
-                  color.withOpacity(0.12),
+                  color.withOpacity(
+                0.12,
+              ),
               inactiveTrackColor:
                   Colors.grey.shade300,
               trackHeight: 3,
@@ -221,14 +389,20 @@ class SimulationAnalysisControls extends StatelessWidget {
               value: value,
               min: min,
               max: max,
-              divisions: divisions,
-              onChanged: onChanged,
+              divisions:
+                  divisions,
+              onChanged:
+                  onChanged,
             ),
           ),
         ),
       ],
     );
   }
+
+  // ============================================================
+  // CHIP
+  // ============================================================
 
   Widget _buildAnalysisChip({
     required Color color,
@@ -240,16 +414,20 @@ class SimulationAnalysisControls extends StatelessWidget {
         horizontal: 8,
         vertical: 4,
       ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+      decoration:
+          BoxDecoration(
+        color:
+            color.withOpacity(0.08),
         borderRadius:
             BorderRadius.circular(7),
       ),
       child: Text(
         label,
-        style: TextStyle(
+        style:
+            TextStyle(
           fontSize: 11,
-          fontWeight: FontWeight.w600,
+          fontWeight:
+              FontWeight.w600,
           color: color,
         ),
       ),
