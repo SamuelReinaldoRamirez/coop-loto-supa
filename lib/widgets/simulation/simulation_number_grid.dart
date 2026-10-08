@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
-class SimulationNumberGrid
-    extends StatelessWidget {
+class SimulationNumberGrid extends StatelessWidget {
   final Map<int, int> appearances;
   final Map<int, int> overdue;
   final Map<int, int> groupGridCount;
@@ -10,8 +9,7 @@ class SimulationNumberGrid
   final List<int> coldNumbers;
   final List<int> overdueNumbers;
 
-  final bool randomColorsEnabled;
-  final Map<int, Color> randomNumberColors;
+  final bool analysisHighlightEnabled;
   final bool squareBordersEnabled;
 
   const SimulationNumberGrid({
@@ -22,8 +20,7 @@ class SimulationNumberGrid
     required this.hotNumbers,
     required this.coldNumbers,
     required this.overdueNumbers,
-    required this.randomColorsEnabled,
-    required this.randomNumberColors,
+    required this.analysisHighlightEnabled,
     required this.squareBordersEnabled,
   });
 
@@ -51,10 +48,8 @@ class SimulationNumberGrid
 
         return _buildNumber(
           number,
-          color:
-              _getNumberColor(number),
-          textColor:
-              _getNumberTextColor(number),
+          color: _getNumberColor(number),
+          textColor: _getNumberTextColor(number),
         );
       },
     );
@@ -124,26 +119,31 @@ class SimulationNumberGrid
         overdueNumbers.contains(number);
 
     // ==========================================================
-    // COULEUR DU BADGE HOT/COLD
+    // COULEUR DU BADGE HOT / COLD
     //
-    // Si le numéro fait partie des HOT :
-    //      rouge
+    // HOT  -> rouge
+    // COLD -> bleu
     //
-    // Sinon s'il fait partie des COLD :
-    //      bleu
-    //
-    // Pour les autres numéros, on utilise une couleur
-    // correspondant à leur position :
-    //
-    // - au-dessus de la moyenne -> rouge
-    // - en dessous ou égal -> bleu
-    //
-    // Cela permet d'afficher une véritable couleur
-    // Hot/Cold même lorsque le numéro n'est pas surligné.
+    // Pour les autres numéros, on compare la fréquence
+    // à la moyenne des 50 numéros.
     // ==========================================================
 
     final hotColdColor =
         _getHotColdColor(number);
+
+    // ==========================================================
+    // CONTOUR
+    //
+    // Si le numéro est dans les N numéros les plus en retard,
+    // on affiche un contour jaune.
+    //
+    // Ce contour est indépendant du fond rouge / bleu.
+    // ==========================================================
+
+    final BorderSide borderSide =
+        _getBorderSide(
+      isOverdue: isOverdue,
+    );
 
     return AnimatedContainer(
       duration:
@@ -154,16 +154,12 @@ class SimulationNumberGrid
             squareBordersEnabled
                 ? BorderRadius.circular(3)
                 : BorderRadius.circular(50),
-        border: Border.all(
-          color:
-              squareBordersEnabled
-                  ? Colors.black54
-                  : Colors.transparent,
-          width:
-              squareBordersEnabled
-                  ? 2
-                  : 0,
-        ),
+        border:
+            borderSide.width > 0
+                ? Border.fromBorderSide(
+                    borderSide,
+                  )
+                : null,
       ),
       child: Stack(
         children: [
@@ -208,8 +204,8 @@ class SimulationNumberGrid
           //
           // En haut à droite.
           //
-          // La valeur est le nombre de fois où le numéro
-          // est apparu sur les X derniers tirages.
+          // La valeur correspond au nombre d'apparitions
+          // sur les X derniers tirages.
           // ====================================================
 
           Positioned(
@@ -253,6 +249,45 @@ class SimulationNumberGrid
   }
 
   // ============================================================
+  // CONTOUR DU NUMÉRO
+  // ============================================================
+
+  BorderSide _getBorderSide({
+    required bool isOverdue,
+  }) {
+    // ==========================================================
+    // Le contour jaune est activé uniquement lorsque
+    // l'analyse visuelle est activée ET que le numéro
+    // fait partie des N numéros les plus en retard.
+    // ==========================================================
+
+    if (analysisHighlightEnabled &&
+        isOverdue) {
+      return BorderSide(
+        color: Colors.amber.shade700,
+        width: 3,
+      );
+    }
+
+    // ==========================================================
+    // Sinon, si l'utilisateur a activé l'affichage carré,
+    // on conserve le contour noir.
+    // ==========================================================
+
+    if (squareBordersEnabled) {
+      return const BorderSide(
+        color: Colors.black54,
+        width: 2,
+      );
+    }
+
+    return const BorderSide(
+      color: Colors.transparent,
+      width: 0,
+    );
+  }
+
+  // ============================================================
   // COULEUR HOT / COLD
   // ============================================================
 
@@ -278,12 +313,10 @@ class SimulationNumberGrid
     }
 
     // ==========================================================
-    // Pour les numéros qui ne sont pas dans les listes
-    // de surbrillance, on conserve quand même une couleur
-    // Hot/Cold cohérente.
+    // Pour les autres numéros :
     //
-    // On compare la fréquence du numéro à la fréquence
-    // moyenne des 50 numéros.
+    // au-dessus de la moyenne -> rouge
+    // en dessous ou égal -> bleu
     // ==========================================================
 
     if (appearances.isEmpty) {
@@ -325,12 +358,39 @@ class SimulationNumberGrid
   Color _getNumberColor(
     int number,
   ) {
-    if (!randomColorsEnabled) {
+    // ==========================================================
+    // Si l'affichage analytique est désactivé,
+    // tous les numéros restent gris.
+    // ==========================================================
+
+    if (!analysisHighlightEnabled) {
       return Colors.grey.shade200;
     }
 
-    return randomNumberColors[number] ??
-        Colors.grey.shade200;
+    // ==========================================================
+    // HOT -> ROUGE
+    // ==========================================================
+
+    if (hotNumbers.contains(number)) {
+      return Colors.red;
+    }
+
+    // ==========================================================
+    // COLD -> BLEU
+    //
+    // Si un numéro appartient aux deux listes, HOT est
+    // prioritaire car il est testé en premier.
+    // ==========================================================
+
+    if (coldNumbers.contains(number)) {
+      return Colors.blue.shade700;
+    }
+
+    // ==========================================================
+    // NUMÉRO NORMAL
+    // ==========================================================
+
+    return Colors.grey.shade200;
   }
 
   // ============================================================
@@ -340,11 +400,21 @@ class SimulationNumberGrid
   Color _getNumberTextColor(
     int number,
   ) {
-    if (!randomColorsEnabled) {
+    if (!analysisHighlightEnabled) {
       return Colors.black87;
     }
 
-    return Colors.white;
+    final isHot =
+        hotNumbers.contains(number);
+
+    final isCold =
+        coldNumbers.contains(number);
+
+    if (isHot || isCold) {
+      return Colors.white;
+    }
+
+    return Colors.black87;
   }
 
   // ============================================================

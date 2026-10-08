@@ -29,17 +29,24 @@ class SimulateGridPage extends StatefulWidget {
 
 class _SimulateGridPageState
     extends State<SimulateGridPage> {
-  final Random _random = Random();
   final ApiService _apiService = ApiService();
 
   // ============================================================
   // EFFETS VISUELS
   // ============================================================
 
-  bool _randomColorsEnabled = false;
-  bool _squareBordersEnabled = false;
+  // Flèche droite :
+  //
+  // lorsqu'elle est activée :
+  // - les HOT sont rouges ;
+  // - les COLD sont bleus ;
+  // - les numéros les plus en retard ont un contour jaune.
+  bool _analysisHighlightEnabled = false;
 
-  final Map<int, Color> _randomNumberColors = {};
+  // Flèche gauche :
+  //
+  // affiche ou masque les contours carrés.
+  bool _squareBordersEnabled = false;
 
   // ============================================================
   // PARAMÈTRES D'ANALYSE
@@ -81,9 +88,8 @@ class _SimulateGridPageState
 
   // Nombre d'apparitions sur les X derniers tirages.
   //
-  // IMPORTANT :
-  // cette valeur correspond maintenant directement
-  // à la valeur Hot/Cold affichée sur chaque numéro.
+  // Cette valeur correspond directement à la valeur
+  // Hot/Cold affichée sur chaque numéro.
   Map<int, int> _appearances = {};
 
   // Nombre de tirages depuis la dernière apparition.
@@ -352,7 +358,7 @@ class _SimulateGridPageState
     // analysée pour Hot/Cold.
     //
     // Le retard cherche la dernière apparition du numéro
-    // dans les tirages disponibles.
+    // dans TOUS les tirages disponibles.
     //
     // Tirage le plus récent = index 0
     //
@@ -594,28 +600,13 @@ class _SimulateGridPageState
   }
 
   // ============================================================
-  // COULEURS ALÉATOIRES
+  // ANALYSE VISUELLE
   // ============================================================
 
-  void _toggleRandomColors() {
+  void _toggleAnalysisHighlight() {
     setState(() {
-      _randomColorsEnabled =
-          !_randomColorsEnabled;
-
-      if (_randomColorsEnabled) {
-        _randomNumberColors.clear();
-
-        for (int number = 1;
-            number <= 50;
-            number++) {
-          _randomNumberColors[number] =
-              _random.nextBool()
-                  ? Colors.red
-                  : Colors.blue;
-        }
-      } else {
-        _randomNumberColors.clear();
-      }
+      _analysisHighlightEnabled =
+          !_analysisHighlightEnabled;
     });
   }
 
@@ -681,6 +672,12 @@ class _SimulateGridPageState
       ),
       elevation: 0,
       actions: [
+        // ======================================================
+        // FLÈCHE GAUCHE
+        //
+        // Affiche / masque les contours carrés.
+        // ======================================================
+
         IconButton(
           tooltip:
               _squareBordersEnabled
@@ -699,18 +696,29 @@ class _SimulateGridPageState
                     : Colors.grey.shade700,
           ),
         ),
+
+        // ======================================================
+        // FLÈCHE DROITE
+        //
+        // Active / désactive :
+        //
+        // - HOT = rouge
+        // - COLD = bleu
+        // - RETARD = contour jaune
+        // ======================================================
+
         IconButton(
           tooltip:
-              _randomColorsEnabled
-                  ? 'Désactiver les couleurs'
-                  : 'Colorer les numéros',
+              _analysisHighlightEnabled
+                  ? 'Masquer les analyses'
+                  : 'Afficher les analyses',
           onPressed:
-              _toggleRandomColors,
+              _toggleAnalysisHighlight,
           icon: Icon(
             Icons.arrow_right_rounded,
             size: 34,
             color:
-                _randomColorsEnabled
+                _analysisHighlightEnabled
                     ? Theme.of(context)
                         .colorScheme
                         .primary
@@ -888,10 +896,8 @@ class _SimulateGridPageState
                   _coldNumbers,
               overdueNumbers:
                   _overdueNumbers,
-              randomColorsEnabled:
-                  _randomColorsEnabled,
-              randomNumberColors:
-                  _randomNumberColors,
+              analysisHighlightEnabled:
+                  _analysisHighlightEnabled,
               squareBordersEnabled:
                   _squareBordersEnabled,
             ),
