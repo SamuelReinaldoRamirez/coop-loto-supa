@@ -161,18 +161,61 @@ class SimulationAnalysisControls extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                TextButton.icon(
-                  onPressed: () => onSortModeChanged(
-                    SimulationNumberSortMode.numericAscending,
-                  ),
-                  icon: const Icon(Icons.format_list_numbered, size: 15),
-                  label: const Text('Numérique'),
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    minimumSize: const Size(0, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Ordre numérique croissant',
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 32,
+                      ),
+                      padding: EdgeInsets.zero,
+                      onPressed: () => onSortModeChanged(
+                        SimulationNumberSortMode.numericAscending,
+                      ),
+                      icon: Icon(
+                        Icons.arrow_upward_rounded,
+                        size: 18,
+                        color: sortMode == SimulationNumberSortMode.numericAscending
+                            ? Colors.black87
+                            : Colors.grey.shade500,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Ordre numérique décroissant',
+                      visualDensity: VisualDensity.compact,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 32,
+                      ),
+                      padding: EdgeInsets.zero,
+                      onPressed: () => onSortModeChanged(
+                        SimulationNumberSortMode.numericDescending,
+                      ),
+                      icon: Icon(
+                        Icons.arrow_downward_rounded,
+                        size: 18,
+                        color: sortMode == SimulationNumberSortMode.numericDescending
+                            ? Colors.black87
+                            : Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
                 ),
+                // TextButton.icon(
+                //   onPressed: () => onSortModeChanged(
+                //     SimulationNumberSortMode.numericAscending,
+                //   ),
+                //   icon: const Icon(Icons.format_list_numbered, size: 15),
+                //   label: const Text('Numérique'),
+                //   style: TextButton.styleFrom(
+                //     padding: const EdgeInsets.symmetric(horizontal: 6),
+                //     minimumSize: const Size(0, 30),
+                //     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                //   ),
+                // ),
               ],
             ),
             const SizedBox(height: 4),

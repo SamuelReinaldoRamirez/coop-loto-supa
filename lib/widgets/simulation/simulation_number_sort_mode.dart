@@ -1,6 +1,7 @@
 /// Critères de tri de la grille des 50 numéros.
 enum SimulationNumberSortMode {
   numericAscending,
+  numericDescending,
   hotDescending,
   hotAscending,
   coldDescending,
@@ -14,6 +15,8 @@ extension SimulationNumberSortModeLabel on SimulationNumberSortMode {
     switch (this) {
       case SimulationNumberSortMode.numericAscending:
         return 'Ordre numérique';
+      case SimulationNumberSortMode.numericDescending:
+        return 'Ordre numérique décroissant';
       case SimulationNumberSortMode.hotDescending:
         return 'Du plus hot au moins hot';
       case SimulationNumberSortMode.hotAscending:

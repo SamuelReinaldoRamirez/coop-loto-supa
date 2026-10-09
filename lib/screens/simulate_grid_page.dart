@@ -78,6 +78,9 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
         case SimulationNumberSortMode.numericAscending:
           comparison = a.compareTo(b);
           break;
+        case SimulationNumberSortMode.numericDescending:
+          comparison = b.compareTo(a);
+          break;
         case SimulationNumberSortMode.hotDescending:
           comparison = (_statistics.appearances[b] ?? 0)
               .compareTo(_statistics.appearances[a] ?? 0);
