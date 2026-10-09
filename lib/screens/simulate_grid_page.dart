@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../services/api_service.dart';
+import '../services/simulation/simulation_draw_parser.dart';
+import '../services/simulation/simulation_statistics_service.dart';
 import '../widgets/simulation/simulation_analysis_controls.dart';
-import '../widgets/simulation/simulation_legend.dart';
+import '../widgets/simulation/simulation_body.dart';
 import '../widgets/simulation/simulation_navigation_arrow.dart';
-import '../widgets/simulation/simulation_number_grid.dart';
-import '../widgets/simulation/simulation_stars_grid.dart';
+import '../widgets/simulation/simulation_number_sort_mode.dart';
 
 class SimulateGridPage extends StatefulWidget {
   final int groupId;
@@ -23,607 +24,204 @@ class SimulateGridPage extends StatefulWidget {
   });
 
   @override
-  State<SimulateGridPage> createState() =>
-      _SimulateGridPageState();
+  State<SimulateGridPage> createState() => _SimulateGridPageState();
 }
 
-class _SimulateGridPageState
-    extends State<SimulateGridPage> {
+class _SimulateGridPageState extends State<SimulateGridPage> {
   final ApiService _apiService = ApiService();
+  final SimulationStatisticsService _statisticsService =
+      const SimulationStatisticsService();
 
-  // ============================================================
-  // EFFETS VISUELS
-  // ============================================================
-
-  // Flèche droite :
-  //
-  // lorsqu'elle est activée :
-  // - les HOT sont rouges ;
-  // - les COLD sont bleus ;
-  // - les numéros les plus en retard ont un contour jaune.
   bool _analysisHighlightEnabled = false;
-
-  // Flèche gauche :
-  //
-  // affiche ou masque les contours carrés.
   bool _squareBordersEnabled = false;
+  SimulationNumberSortMode _sortMode =
+      SimulationNumberSortMode.numericAscending;
 
-  // ============================================================
-  // PARAMÈTRES D'ANALYSE
-  // ============================================================
-
-  // Slider noir :
-  // nombre de derniers tirages utilisés pour calculer
-  // la valeur Hot/Cold.
   double _drawHistoryCount = 30;
-
-  // Slider rouge :
-  // nombre de numéros HOT à mettre en évidence.
   double _hotCount = 10;
-
-  // Slider bleu :
-  // nombre de numéros COLD à mettre en évidence.
   double _coldCount = 10;
-
-  // Slider jaune :
-  // nombre de numéros les plus en retard à mettre
-  // en évidence.
   double _overdueCount = 10;
 
-  // ============================================================
-  // TIRAGES CHARGÉS EN MÉMOIRE
-  // ============================================================
-
   List<Map<String, dynamic>> _draws = [];
-
   int _availableDrawCount = 1;
-
   bool _isLoadingDraws = true;
-
   String? _drawError;
 
-  // ============================================================
-  // STATISTIQUES CALCULÉES
-  // ============================================================
+  SimulationStatistics _statistics = SimulationStatistics.empty();
 
-  // Nombre d'apparitions sur les X derniers tirages.
-  //
-  // Cette valeur correspond directement à la valeur
-  // Hot/Cold affichée sur chaque numéro.
-  Map<int, int> _appearances = {};
+  int get _selectedDrawHistoryCount => _drawHistoryCount.round();
+  int get _selectedHotCount => _hotCount.round();
+  int get _selectedColdCount => _coldCount.round();
+  int get _selectedOverdueCount => _overdueCount.round();
 
-  // Nombre de tirages depuis la dernière apparition.
-  //
-  // Cette valeur est indépendante du slider jaune.
-  Map<int, int> _overdue = {};
+  List<int> get _hotNumbers => _statisticsService.selectHotNumbers(
+        _statistics.appearances,
+        _selectedHotCount,
+      );
 
-  // Nombre de fois où le numéro a été joué par le groupe.
-  //
-  // Pour le moment MOCK :
-  // tous les numéros valent 5.
-  Map<int, int> _groupGridCount = {};
+  List<int> get _coldNumbers => _statisticsService.selectColdNumbers(
+        _statistics.appearances,
+        _selectedColdCount,
+      );
 
-  // ============================================================
-  // INITIALISATION
-  // ============================================================
+  List<int> get _overdueNumbers => _statisticsService.selectOverdueNumbers(
+        _statistics.overdue,
+        _selectedOverdueCount,
+      );
+
+  List<int> get _orderedNumbers {
+    final numbers = List<int>.generate(50, (index) => index + 1);
+
+    numbers.sort((a, b) {
+      int comparison;
+      switch (_sortMode) {
+        case SimulationNumberSortMode.numericAscending:
+          comparison = a.compareTo(b);
+          break;
+        case SimulationNumberSortMode.hotDescending:
+          comparison = (_statistics.appearances[b] ?? 0)
+              .compareTo(_statistics.appearances[a] ?? 0);
+          break;
+        case SimulationNumberSortMode.hotAscending:
+          comparison = (_statistics.appearances[a] ?? 0)
+              .compareTo(_statistics.appearances[b] ?? 0);
+          break;
+        case SimulationNumberSortMode.coldDescending:
+          comparison = (_statistics.appearances[a] ?? 0)
+              .compareTo(_statistics.appearances[b] ?? 0);
+          break;
+        case SimulationNumberSortMode.coldAscending:
+          comparison = (_statistics.appearances[b] ?? 0)
+              .compareTo(_statistics.appearances[a] ?? 0);
+          break;
+        case SimulationNumberSortMode.overdueDescending:
+          comparison = (_statistics.overdue[b] ?? 0)
+              .compareTo(_statistics.overdue[a] ?? 0);
+          break;
+        case SimulationNumberSortMode.overdueAscending:
+          comparison = (_statistics.overdue[a] ?? 0)
+              .compareTo(_statistics.overdue[b] ?? 0);
+          break;
+      }
+
+      // En cas d'égalité, on garde l'ordre numérique pour stabiliser la grille.
+      return comparison != 0 ? comparison : a.compareTo(b);
+    });
+
+    return numbers;
+  }
+
+  void _onSortModeChanged(SimulationNumberSortMode mode) {
+    setState(() {
+      _sortMode = mode;
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-
-    _generateInitialGroupStatistics();
     _loadAllDraws();
   }
 
-  // ============================================================
-  // CHARGEMENT DE TOUS LES TIRAGES
-  // ============================================================
-
   Future<void> _loadAllDraws() async {
+    setState(() {
+      _isLoadingDraws = true;
+      _drawError = null;
+    });
+
     try {
-      print(
-        '[SimulateGridPage] '
-        'Chargement de tous les tirages...',
-      );
+      debugPrint('[SimulateGridPage] Chargement de tous les tirages...');
+      final response = await _apiService.fetchEuromillionsDraws();
+      final parsedDraws = SimulationDrawParser.parseResponse(response);
 
-      final response =
-          await _apiService.fetchEuromillionsDraws();
+      debugPrint('[SimulateGridPage] Tirages valides : ${parsedDraws.length}');
 
-      print(
-        '[SimulateGridPage] '
-        'Nombre de tirages reçus : ${response.length}',
-      );
-
-      final parsedDraws =
-          <Map<String, dynamic>>[];
-
-      for (final item in response) {
-        if (item is! Map) {
-          continue;
-        }
-
-        final draw =
-            Map<String, dynamic>.from(item);
-
-        final drawDate =
-            DateTime.tryParse(
-          '${draw['draw_date']}',
-        );
-
-        if (drawDate == null) {
-          continue;
-        }
-
-        final numbers =
-            _extractMainNumbers(draw);
-
-        if (numbers.length != 5) {
-          continue;
-        }
-
-        parsedDraws.add({
-          ...draw,
-          '_parsedDate': drawDate,
-        });
-      }
-
-      // ========================================================
-      // TRI DU PLUS RÉCENT AU PLUS ANCIEN
-      // ========================================================
-
-      parsedDraws.sort(
-        (a, b) {
-          final dateA =
-              a['_parsedDate'] as DateTime;
-
-          final dateB =
-              b['_parsedDate'] as DateTime;
-
-          return dateB.compareTo(dateA);
-        },
-      );
-
-      print(
-        '[SimulateGridPage] '
-        'Tirages valides : ${parsedDraws.length}',
-      );
-
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       if (parsedDraws.isEmpty) {
         setState(() {
           _draws = [];
           _availableDrawCount = 1;
           _drawHistoryCount = 1;
+          _statistics = SimulationStatistics.empty();
           _isLoadingDraws = false;
-          _drawError =
-              'Aucun tirage valide disponible.';
+          _drawError = 'Aucun tirage valide disponible.';
         });
-
         return;
       }
 
       setState(() {
         _draws = parsedDraws;
-
-        _availableDrawCount =
-            parsedDraws.length;
-
-        _drawHistoryCount =
-            min(
-              30,
-              _availableDrawCount,
-            ).toDouble();
-
+        _availableDrawCount = parsedDraws.length;
+        _drawHistoryCount = min(30, _availableDrawCount).toDouble();
         _isLoadingDraws = false;
-
         _drawError = null;
       });
 
-      // ========================================================
-      // PREMIER CALCUL
-      // ========================================================
-
       _recalculateStatistics();
-    } catch (e, stackTrace) {
-      print(
-        '[SimulateGridPage] '
-        'Erreur chargement tirages : $e',
-      );
+    } catch (error, stackTrace) {
+      debugPrint('[SimulateGridPage] Erreur chargement tirages : $error');
+      debugPrintStack(stackTrace: stackTrace);
 
-      print(stackTrace);
-
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
 
       setState(() {
         _isLoadingDraws = false;
-
-        _drawError =
-            'Impossible de charger les tirages.';
+        _drawError = 'Impossible de charger les tirages.';
       });
     }
   }
 
-  // ============================================================
-  // EXTRACTION DES 5 NUMÉROS
-  // ============================================================
-
-  List<int> _extractMainNumbers(
-    Map<String, dynamic> draw,
-  ) {
-    final numbers = <int>[];
-
-    for (int i = 1; i <= 5; i++) {
-      final value = draw['n$i'];
-
-      if (value == null) {
-        continue;
-      }
-
-      final number =
-          int.tryParse(
-        value.toString(),
-      );
-
-      if (number != null &&
-          number >= 1 &&
-          number <= 50) {
-        numbers.add(number);
-      }
-    }
-
-    return numbers;
-  }
-
-  // ============================================================
-  // CALCUL DES STATISTIQUES
-  // ============================================================
-
   void _recalculateStatistics() {
-    if (_draws.isEmpty) {
-      return;
-    }
+    if (_draws.isEmpty) return;
 
-    // ==========================================================
-    // X = NOMBRE DE DERNIERS TIRAGES
-    //
-    // Ce X est uniquement déterminé par le slider noir.
-    //
-    // Il sert à calculer la valeur Hot/Cold.
-    // ==========================================================
-
-    final selectedDrawCount =
-        _selectedDrawHistoryCount.clamp(
-      1,
-      _draws.length,
+    final result = _statisticsService.calculate(
+      draws: _draws,
+      selectedDrawCount: _selectedDrawHistoryCount,
     );
 
-    // ==========================================================
-    // ON PREND LES X DERNIERS TIRAGES
-    //
-    // _draws est déjà trié du plus récent au plus ancien.
-    // ==========================================================
-
-    final recentDraws =
-        _draws
-            .take(selectedDrawCount)
-            .toList();
-
-    // ==========================================================
-    // HOT / COLD
-    //
-    // Pour chaque numéro :
-    //
-    // valeur = nombre de tirages parmi les X derniers
-    // tirages dans lesquels le numéro est apparu.
-    //
-    // Exemple :
-    //
-    // slider noir = 30
-    // numéro 17 apparaît dans 8 des 30 derniers tirages
-    //
-    // => valeur Hot/Cold du 17 = 8
-    // ==========================================================
-
-    final appearances =
-        <int, int>{
-      for (int number = 1;
-          number <= 50;
-          number++)
-        number: 0,
-    };
-
-    for (final draw in recentDraws) {
-      final numbers =
-          _extractMainNumbers(draw);
-
-      for (final number in numbers) {
-        appearances[number] =
-            (appearances[number] ?? 0) + 1;
-      }
-    }
-
-    // ==========================================================
-    // RETARD
-    //
-    // IMPORTANT :
-    //
-    // Le retard est calculé indépendamment du slider jaune.
-    //
-    // Le slider noir définit uniquement la fenêtre de tirages
-    // analysée pour Hot/Cold.
-    //
-    // Le retard cherche la dernière apparition du numéro
-    // dans TOUS les tirages disponibles.
-    //
-    // Tirage le plus récent = index 0
-    //
-    // présent au dernier tirage -> retard 0
-    // présent au tirage précédent -> retard 1
-    // etc.
-    //
-    // Si le numéro n'est jamais retrouvé dans les tirages
-    // disponibles, on utilise _draws.length.
-    // ==========================================================
-
-    final overdue =
-        <int, int>{};
-
-    for (int number = 1;
-        number <= 50;
-        number++) {
-      int delay = _draws.length;
-
-      for (int index = 0;
-          index < _draws.length;
-          index++) {
-        final numbers =
-            _extractMainNumbers(
-          _draws[index],
-        );
-
-        if (numbers.contains(number)) {
-          delay = index;
-          break;
-        }
-      }
-
-      overdue[number] = delay;
-    }
-
-    // ==========================================================
-    // GROUP GRID COUNT
-    //
-    // MOCK POUR LE MOMENT :
-    // chaque numéro a une valeur de 5.
-    // ==========================================================
-
-    final groupGridCount =
-        <int, int>{
-      for (int number = 1;
-          number <= 50;
-          number++)
-        number: 5,
-    };
-
-    // ==========================================================
-    // MISE À JOUR DE L'INTERFACE
-    // ==========================================================
-
-    if (!mounted) {
-      return;
-    }
-
+    if (!mounted) return;
     setState(() {
-      _appearances = appearances;
-      _overdue = overdue;
-      _groupGridCount = groupGridCount;
+      _statistics = result;
     });
-
-    print(
-      '[SimulateGridPage] '
-      'Statistiques recalculées : '
-      '$selectedDrawCount derniers tirages',
-    );
   }
 
-  // ============================================================
-  // STATISTIQUES INITIALES DU GROUPE
-  // ============================================================
-
-  void _generateInitialGroupStatistics() {
-    // ==========================================================
-    // MOCK :
-    // tous les numéros ont été joués 5 fois par le groupe.
-    // ==========================================================
-
-    _groupGridCount = {
-      for (int number = 1;
-          number <= 50;
-          number++)
-        number: 5,
-    };
-
-    _appearances = {
-      for (int number = 1;
-          number <= 50;
-          number++)
-        number: 0,
-    };
-
-    _overdue = {
-      for (int number = 1;
-          number <= 50;
-          number++)
-        number: 0,
-    };
+  void _onDrawHistoryChanged(double value) {
+    setState(() {
+      _drawHistoryCount = value.clamp(1, max(1, _availableDrawCount).toDouble()).toDouble();
+    });
+    _recalculateStatistics();
   }
 
-  // ============================================================
-  // VALEURS DES CURSEURS
-  // ============================================================
-
-  int get _selectedDrawHistoryCount =>
-      _drawHistoryCount.round();
-
-  int get _selectedHotCount =>
-      _hotCount.round();
-
-  int get _selectedColdCount =>
-      _coldCount.round();
-
-  int get _selectedOverdueCount =>
-      _overdueCount.round();
-
-  // ============================================================
-  // NUMÉROS HOT
-  //
-  // Les plus grandes valeurs Hot/Cold sont les HOT.
-  // ============================================================
-
-  List<int> get _hotNumbers {
-    final numbers =
-        List.generate(
-      50,
-      (index) => index + 1,
-    );
-
-    numbers.sort(
-      (a, b) {
-        final comparison =
-            (_appearances[b] ?? 0)
-                .compareTo(
-          _appearances[a] ?? 0,
-        );
-
-        if (comparison != 0) {
-          return comparison;
-        }
-
-        return a.compareTo(b);
-      },
-    );
-
-    return numbers
-        .take(
-          min(
-            _selectedHotCount,
-            50,
-          ),
-        )
-        .toList();
+  void _onHotChanged(double value) {
+    setState(() {
+      _hotCount = value.clamp(1, 50).toDouble();
+    });
   }
 
-  // ============================================================
-  // NUMÉROS COLD
-  //
-  // Les plus petites valeurs Hot/Cold sont les COLD.
-  // ============================================================
-
-  List<int> get _coldNumbers {
-    final numbers =
-        List.generate(
-      50,
-      (index) => index + 1,
-    );
-
-    numbers.sort(
-      (a, b) {
-        final comparison =
-            (_appearances[a] ?? 0)
-                .compareTo(
-          _appearances[b] ?? 0,
-        );
-
-        if (comparison != 0) {
-          return comparison;
-        }
-
-        return a.compareTo(b);
-      },
-    );
-
-    return numbers
-        .take(
-          min(
-            _selectedColdCount,
-            50,
-          ),
-        )
-        .toList();
+  void _onColdChanged(double value) {
+    setState(() {
+      _coldCount = value.clamp(1, 50).toDouble();
+    });
   }
 
-  // ============================================================
-  // NUMÉROS EN RETARD
-  //
-  // Les plus grandes valeurs de retard sont les plus en retard.
-  //
-  // Le slider jaune ne modifie PAS le calcul du retard.
-  // Il indique uniquement combien de numéros sont surlignés.
-  // ============================================================
-
-  List<int> get _overdueNumbers {
-    final numbers =
-        List.generate(
-      50,
-      (index) => index + 1,
-    );
-
-    numbers.sort(
-      (a, b) {
-        final comparison =
-            (_overdue[b] ?? 0)
-                .compareTo(
-          _overdue[a] ?? 0,
-        );
-
-        if (comparison != 0) {
-          return comparison;
-        }
-
-        return a.compareTo(b);
-      },
-    );
-
-    return numbers
-        .take(
-          min(
-            _selectedOverdueCount,
-            50,
-          ),
-        )
-        .toList();
+  void _onOverdueChanged(double value) {
+    setState(() {
+      _overdueCount = value.clamp(1, 50).toDouble();
+    });
   }
-
-  // ============================================================
-  // ANALYSE VISUELLE
-  // ============================================================
 
   void _toggleAnalysisHighlight() {
     setState(() {
-      _analysisHighlightEnabled =
-          !_analysisHighlightEnabled;
+      _analysisHighlightEnabled = !_analysisHighlightEnabled;
     });
   }
-
-  // ============================================================
-  // CARRÉS
-  // ============================================================
 
   void _toggleSquareBorders() {
     setState(() {
-      _squareBordersEnabled =
-          !_squareBordersEnabled;
+      _squareBordersEnabled = !_squareBordersEnabled;
     });
   }
-
-  // ============================================================
-  // NAVIGATION
-  // ============================================================
 
   void _openPreviousDraws() {
     context.push(
@@ -639,443 +237,122 @@ class _SimulateGridPageState
     );
   }
 
-  // ============================================================
-  // BUILD
-  // ============================================================
+  void _generateGrid() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Génération de grille — bientôt disponible.'),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF5F6FA),
-      appBar:
-          _buildAppBar(context),
-      body:
-          _buildBody(context),
+      backgroundColor: const Color(0xFFF5F6FA),
+      appBar: _buildAppBar(context),
+      body: Stack(
+        children: [
+          SimulationBody(
+            isLoading: _isLoadingDraws,
+            error: _drawError,
+            onRetry: _loadAllDraws,
+            availableDrawCount: _availableDrawCount,
+            analysisControls: _buildAnalysisControls(),
+            appearances: _statistics.appearances,
+            overdue: _statistics.overdue,
+            groupGridCount: _statistics.groupGridCount,
+            hotNumbers: _hotNumbers,
+            coldNumbers: _coldNumbers,
+            overdueNumbers: _overdueNumbers,
+            orderedNumbers: _orderedNumbers,
+            analysisHighlightEnabled: _analysisHighlightEnabled,
+            squareBordersEnabled: _squareBordersEnabled,
+            onGenerateGrid: _generateGrid,
+          ),
+          if (!_isLoadingDraws && _drawError == null) ...[
+            Positioned(
+              left: 4,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: SimulationNavigationArrow(
+                  direction: NavigationArrowDirection.left,
+                  onTap: _openGroupPlayedGrids,
+                ),
+              ),
+            ),
+            Positioned(
+              right: 4,
+              top: 0,
+              bottom: 0,
+              child: Center(
+                child: SimulationNavigationArrow(
+                  direction: NavigationArrowDirection.right,
+                  onTap: _openPreviousDraws,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
-  // ============================================================
-  // APP BAR
-  // ============================================================
-
-  PreferredSizeWidget _buildAppBar(
-    BuildContext context,
-  ) {
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
       title: const Text(
         'Simuler une grille',
-        style: TextStyle(
-          fontWeight:
-              FontWeight.bold,
-        ),
+        style: TextStyle(fontWeight: FontWeight.bold),
       ),
       elevation: 0,
       actions: [
-        // ======================================================
-        // FLÈCHE GAUCHE
-        //
-        // Affiche / masque les contours carrés.
-        // ======================================================
-
         IconButton(
-          tooltip:
-              _squareBordersEnabled
-                  ? 'Désactiver les carrés'
-                  : 'Afficher les carrés',
-          onPressed:
-              _toggleSquareBorders,
+          tooltip: _squareBordersEnabled
+              ? 'Désactiver les carrés'
+              : 'Afficher les carrés',
+          onPressed: _toggleSquareBorders,
           icon: Icon(
             Icons.arrow_left_rounded,
             size: 34,
-            color:
-                _squareBordersEnabled
-                    ? Theme.of(context)
-                        .colorScheme
-                        .primary
-                    : Colors.grey.shade700,
+            color: _squareBordersEnabled
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey.shade700,
           ),
         ),
-
-        // ======================================================
-        // FLÈCHE DROITE
-        //
-        // Active / désactive :
-        //
-        // - HOT = rouge
-        // - COLD = bleu
-        // - RETARD = contour jaune
-        // ======================================================
-
         IconButton(
-          tooltip:
-              _analysisHighlightEnabled
-                  ? 'Masquer les analyses'
-                  : 'Afficher les analyses',
-          onPressed:
-              _toggleAnalysisHighlight,
+          tooltip: _analysisHighlightEnabled
+              ? 'Masquer les analyses'
+              : 'Afficher les analyses',
+          onPressed: _toggleAnalysisHighlight,
           icon: Icon(
             Icons.arrow_right_rounded,
             size: 34,
-            color:
-                _analysisHighlightEnabled
-                    ? Theme.of(context)
-                        .colorScheme
-                        .primary
-                    : Colors.grey.shade700,
+            color: _analysisHighlightEnabled
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey.shade700,
           ),
         ),
       ],
     );
   }
-
-  // ============================================================
-  // BODY
-  // ============================================================
-
-  Widget _buildBody(
-    BuildContext context,
-  ) {
-    if (_isLoadingDraws) {
-      return const Center(
-        child: Column(
-          mainAxisSize:
-              MainAxisSize.min,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text(
-              'Chargement des tirages...',
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_drawError != null) {
-      return Center(
-        child: Padding(
-          padding:
-              const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize:
-                MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Colors.red,
-              ),
-              const SizedBox(
-                height: 16,
-              ),
-              Text(
-                _drawError!,
-                textAlign:
-                    TextAlign.center,
-              ),
-              const SizedBox(
-                height: 16,
-              ),
-              ElevatedButton.icon(
-                onPressed:
-                    _loadAllDraws,
-                icon: const Icon(
-                  Icons.refresh,
-                ),
-                label: const Text(
-                  'Réessayer',
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Stack(
-      children: [
-        ListView(
-          padding:
-              const EdgeInsets.fromLTRB(
-            55,
-            16,
-            55,
-            30,
-          ),
-          children: [
-            const Text(
-              'Simulation',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight:
-                    FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(
-              height: 6,
-            ),
-
-            Text(
-              'Analyse des 50 numéros et des 12 étoiles.',
-              style: TextStyle(
-                fontSize: 14,
-                color:
-                    Colors.grey.shade600,
-              ),
-            ),
-
-            const SizedBox(
-              height: 12,
-            ),
-
-            Text(
-              '$_availableDrawCount tirages chargés '
-              'en mémoire',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight:
-                    FontWeight.w600,
-                color:
-                    Colors.grey.shade700,
-              ),
-            ),
-
-            const SizedBox(
-              height: 20,
-            ),
-
-            _buildAnalysisControls(),
-
-            const SizedBox(
-              height: 20,
-            ),
-
-            const Text(
-              'Numéros',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight:
-                    FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(
-              height: 5,
-            ),
-
-            Text(
-              'Chaque numéro affiche le nombre de grilles du groupe, '
-              'son retard et sa fréquence Hot/Cold.',
-              style: TextStyle(
-                fontSize: 12,
-                color:
-                    Colors.grey.shade600,
-              ),
-            ),
-
-            const SizedBox(
-              height: 12,
-            ),
-
-            // ==================================================
-            // LES 50 NUMÉROS
-            // ==================================================
-
-            SimulationNumberGrid(
-              appearances:
-                  _appearances,
-              overdue:
-                  _overdue,
-              groupGridCount:
-                  _groupGridCount,
-              hotNumbers:
-                  _hotNumbers,
-              coldNumbers:
-                  _coldNumbers,
-              overdueNumbers:
-                  _overdueNumbers,
-              analysisHighlightEnabled:
-                  _analysisHighlightEnabled,
-              squareBordersEnabled:
-                  _squareBordersEnabled,
-            ),
-
-            const SizedBox(
-              height: 24,
-            ),
-
-            const Text(
-              'Étoiles',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight:
-                    FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(
-              height: 12,
-            ),
-
-            SimulationStarsGrid(
-              squareBordersEnabled:
-                  _squareBordersEnabled,
-            ),
-
-            const SizedBox(
-              height: 24,
-            ),
-
-            const SimulationLegend(),
-
-            const SizedBox(
-              height: 24,
-            ),
-
-            SizedBox(
-              width:
-                  double.infinity,
-              child:
-                  ElevatedButton.icon(
-                onPressed:
-                    _generateGrid,
-                icon: const Icon(
-                  Icons.auto_awesome_rounded,
-                ),
-                label: const Text(
-                  'Générer cette grille',
-                ),
-                style:
-                    ElevatedButton.styleFrom(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    vertical: 14,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-
-        Positioned(
-          left: 4,
-          top: 0,
-          bottom: 0,
-          child: Center(
-            child:
-                SimulationNavigationArrow(
-              direction:
-                  NavigationArrowDirection
-                      .left,
-              onTap:
-                  _openGroupPlayedGrids,
-            ),
-          ),
-        ),
-
-        Positioned(
-          right: 4,
-          top: 0,
-          bottom: 0,
-          child: Center(
-            child:
-                SimulationNavigationArrow(
-              direction:
-                  NavigationArrowDirection
-                      .right,
-              onTap:
-                  _openPreviousDraws,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ============================================================
-  // PARAMÈTRES D'ANALYSE
-  // ============================================================
 
   Widget _buildAnalysisControls() {
     return SimulationAnalysisControls(
-      drawHistoryCount:
-          _drawHistoryCount,
-      hotCount:
-          _hotCount,
-      coldCount:
-          _coldCount,
-      overdueCount:
-          _overdueCount,
-
-      drawHistoryMax:
-          _availableDrawCount,
-
-      selectedDrawHistoryCount:
-          _selectedDrawHistoryCount,
-      selectedHotCount:
-          _selectedHotCount,
-      selectedColdCount:
-          _selectedColdCount,
-      selectedOverdueCount:
-          _selectedOverdueCount,
-
-      onDrawHistoryChanged:
-          (value) {
-        setState(() {
-          _drawHistoryCount =
-              value;
-        });
-
-        _recalculateStatistics();
-      },
-
-      onHotChanged:
-          (value) {
-        setState(() {
-          _hotCount =
-              value;
-        });
-
-        _recalculateStatistics();
-      },
-
-      onColdChanged:
-          (value) {
-        setState(() {
-          _coldCount =
-              value;
-        });
-
-        _recalculateStatistics();
-      },
-
-      onOverdueChanged:
-          (value) {
-        setState(() {
-          _overdueCount =
-              value;
-        });
-
-        _recalculateStatistics();
-      },
-    );
-  }
-
-  // ============================================================
-  // GÉNÉRATION
-  // ============================================================
-
-  void _generateGrid() {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Génération de grille — bientôt disponible.',
-        ),
-      ),
+      drawHistoryCount: _drawHistoryCount,
+      hotCount: _hotCount,
+      coldCount: _coldCount,
+      overdueCount: _overdueCount,
+      drawHistoryMax: _availableDrawCount,
+      selectedDrawHistoryCount: _selectedDrawHistoryCount,
+      selectedHotCount: _selectedHotCount,
+      selectedColdCount: _selectedColdCount,
+      selectedOverdueCount: _selectedOverdueCount,
+      onDrawHistoryChanged: _onDrawHistoryChanged,
+      onHotChanged: _onHotChanged,
+      onColdChanged: _onColdChanged,
+      onOverdueChanged: _onOverdueChanged,
+      sortMode: _sortMode,
+      onSortModeChanged: _onSortModeChanged,
     );
   }
 }

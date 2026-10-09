@@ -12,11 +12,9 @@ class SimulationStarsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return GridView.builder(
       shrinkWrap: true,
-      physics:
-          const NeverScrollableScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: 12,
-      gridDelegate:
-          const SliverGridDelegateWithFixedCrossAxisCount(
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 6,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
@@ -26,21 +24,13 @@ class SimulationStarsGrid extends StatelessWidget {
         final star = index + 1;
 
         return AnimatedContainer(
-          duration:
-              const Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 180),
           decoration: BoxDecoration(
             color: Colors.amber.shade100,
-            borderRadius:
-                squareBordersEnabled
-                    ? BorderRadius.circular(3)
-                    : BorderRadius.circular(50),
+            borderRadius: BorderRadius.circular(squareBordersEnabled ? 3 : 50),
             border: Border.all(
-              color: squareBordersEnabled
-                  ? Colors.black54
-                  : Colors.transparent,
-              width: squareBordersEnabled
-                  ? 2
-                  : 0,
+              color: squareBordersEnabled ? Colors.black54 : Colors.transparent,
+              width: squareBordersEnabled ? 2 : 0,
             ),
           ),
           child: Center(
@@ -48,8 +38,7 @@ class SimulationStarsGrid extends StatelessWidget {
               '★$star',
               style: TextStyle(
                 fontSize: 13,
-                fontWeight:
-                    FontWeight.bold,
+                fontWeight: FontWeight.bold,
                 color: Colors.amber.shade900,
               ),
             ),
