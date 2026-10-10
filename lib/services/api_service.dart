@@ -244,4 +244,30 @@ class ApiService {
     return Map<String, dynamic>.from(response.data as Map);
   }
 
+
+  Future<List<dynamic>> fetchGroupGrids(int groupId) async {
+    print('[Api] fetchGroupGrids -> GET /groups/$groupId/grids');
+
+    final response = await _dio.get('/groups/$groupId/grids');
+
+    print('[Api] fetchGroupGrids status=${response.statusCode}');
+
+    final data = Map<String, dynamic>.from(
+      response.data as Map,
+    );
+
+    final grids = data['grids'];
+
+    if (grids is! List) {
+      throw Exception(
+        'La réponse du serveur ne contient pas de liste de grilles valide.',
+      );
+    }
+
+    print('[Api] fetchGroupGrids count=${grids.length}');
+
+    return grids;
+  }
+
+
 }
