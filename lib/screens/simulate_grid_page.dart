@@ -34,8 +34,9 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
   bool _analysisHighlightEnabled = false;
   bool _squareBordersEnabled = false;
-  SimulationNumberSortMode _sortMode =
-      SimulationNumberSortMode.numericAscending;
+  List<SimulationNumberSortMode> _sortModes = [
+    SimulationNumberSortMode.numericAscending,
+  ];
 
   double _drawHistoryCount = 30;
   double _hotCount = 10;
@@ -69,54 +70,110 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
         _selectedOverdueCount,
       );
 
+  
   List<int> get _orderedNumbers {
     final numbers = List<int>.generate(50, (index) => index + 1);
 
     numbers.sort((a, b) {
-      int comparison;
-      switch (_sortMode) {
-        case SimulationNumberSortMode.numericAscending:
-          comparison = a.compareTo(b);
-          break;
-        case SimulationNumberSortMode.numericDescending:
-          comparison = b.compareTo(a);
-          break;
-        case SimulationNumberSortMode.hotDescending:
-          comparison = (_statistics.appearances[b] ?? 0)
-              .compareTo(_statistics.appearances[a] ?? 0);
-          break;
-        case SimulationNumberSortMode.hotAscending:
-          comparison = (_statistics.appearances[a] ?? 0)
-              .compareTo(_statistics.appearances[b] ?? 0);
-          break;
-        case SimulationNumberSortMode.coldDescending:
-          comparison = (_statistics.appearances[a] ?? 0)
-              .compareTo(_statistics.appearances[b] ?? 0);
-          break;
-        case SimulationNumberSortMode.coldAscending:
-          comparison = (_statistics.appearances[b] ?? 0)
-              .compareTo(_statistics.appearances[a] ?? 0);
-          break;
-        case SimulationNumberSortMode.overdueDescending:
-          comparison = (_statistics.overdue[b] ?? 0)
-              .compareTo(_statistics.overdue[a] ?? 0);
-          break;
-        case SimulationNumberSortMode.overdueAscending:
-          comparison = (_statistics.overdue[a] ?? 0)
-              .compareTo(_statistics.overdue[b] ?? 0);
-          break;
+      for (final mode in _sortModes) {
+        int comparison;
+
+        switch (mode) {
+          case SimulationNumberSortMode.numericAscending:
+            comparison = a.compareTo(b);
+            break;
+
+          case SimulationNumberSortMode.numericDescending:
+            comparison = b.compareTo(a);
+            break;
+
+          case SimulationNumberSortMode.hotDescending:
+            comparison = (_statistics.appearances[b] ?? 0)
+                .compareTo(_statistics.appearances[a] ?? 0);
+            break;
+
+          case SimulationNumberSortMode.hotAscending:
+            comparison = (_statistics.appearances[a] ?? 0)
+                .compareTo(_statistics.appearances[b] ?? 0);
+            break;
+
+          case SimulationNumberSortMode.coldDescending:
+            comparison = (_statistics.appearances[a] ?? 0)
+                .compareTo(_statistics.appearances[b] ?? 0);
+            break;
+
+          case SimulationNumberSortMode.coldAscending:
+            comparison = (_statistics.appearances[b] ?? 0)
+                .compareTo(_statistics.appearances[a] ?? 0);
+            break;
+
+          case SimulationNumberSortMode.overdueDescending:
+            comparison = (_statistics.overdue[b] ?? 0)
+                .compareTo(_statistics.overdue[a] ?? 0);
+            break;
+
+          case SimulationNumberSortMode.overdueAscending:
+            comparison = (_statistics.overdue[a] ?? 0)
+                .compareTo(_statistics.overdue[b] ?? 0);
+            break;
+        }
+
+        // Dès qu'un critère départage les deux numéros,
+        // on utilise son résultat.
+        if (comparison != 0) {
+          return comparison;
+        }
       }
 
-      // En cas d'égalité, on garde l'ordre numérique pour stabiliser la grille.
-      return comparison != 0 ? comparison : a.compareTo(b);
+      // Égalité sur tous les critères : ordre numérique croissant.
+      return a.compareTo(b);
     });
 
     return numbers;
   }
 
+  
   void _onSortModeChanged(SimulationNumberSortMode mode) {
     setState(() {
-      _sortMode = mode;
+      // Un clic sur une flèche numérique réinitialise le tri.
+      if (mode == SimulationNumberSortMode.numericAscending ||
+          mode == SimulationNumberSortMode.numericDescending) {
+        _sortModes = [mode];
+        return;
+      }
+
+      // Un critère statistique remplace le sens opposé
+      // du même critère.
+      final oppositeModes = <SimulationNumberSortMode, SimulationNumberSortMode>{
+        SimulationNumberSortMode.hotDescending:
+            SimulationNumberSortMode.hotAscending,
+        SimulationNumberSortMode.hotAscending:
+            SimulationNumberSortMode.hotDescending,
+        SimulationNumberSortMode.coldDescending:
+            SimulationNumberSortMode.coldAscending,
+        SimulationNumberSortMode.coldAscending:
+            SimulationNumberSortMode.coldDescending,
+        SimulationNumberSortMode.overdueDescending:
+            SimulationNumberSortMode.overdueAscending,
+        SimulationNumberSortMode.overdueAscending:
+            SimulationNumberSortMode.overdueDescending,
+      };
+
+      // Le tri numérique explicite est retiré :
+      // il restera le départage final croissant.
+      _sortModes.remove(SimulationNumberSortMode.numericAscending);
+      _sortModes.remove(SimulationNumberSortMode.numericDescending);
+
+      // On retire l'ancien sens du critère choisi.
+      final oppositeMode = oppositeModes[mode];
+      if (oppositeMode != null) {
+        _sortModes.remove(oppositeMode);
+      }
+
+      // Si ce critère était déjà présent, on le retire
+      // pour le replacer en première position.
+      _sortModes.remove(mode);
+      _sortModes.insert(0, mode);
     });
   }
 
@@ -354,7 +411,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
       onHotChanged: _onHotChanged,
       onColdChanged: _onColdChanged,
       onOverdueChanged: _onOverdueChanged,
-      sortMode: _sortMode,
+      sortModes: _sortModes,
       onSortModeChanged: _onSortModeChanged,
     );
   }

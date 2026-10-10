@@ -18,7 +18,7 @@ class SimulationAnalysisControls extends StatelessWidget {
   final ValueChanged<double> onHotChanged;
   final ValueChanged<double> onColdChanged;
   final ValueChanged<double> onOverdueChanged;
-  final SimulationNumberSortMode sortMode;
+  final List<SimulationNumberSortMode> sortModes;
   final ValueChanged<SimulationNumberSortMode> onSortModeChanged;
 
   const SimulationAnalysisControls({
@@ -36,7 +36,7 @@ class SimulationAnalysisControls extends StatelessWidget {
     required this.onHotChanged,
     required this.onColdChanged,
     required this.onOverdueChanged,
-    required this.sortMode,
+    required this.sortModes,
     required this.onSortModeChanged,
   });
 
@@ -65,6 +65,16 @@ class SimulationAnalysisControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasNumericSort = sortModes.any(
+    (mode) =>
+        mode == SimulationNumberSortMode.numericAscending ||
+        mode == SimulationNumberSortMode.numericDescending,
+  );
+
+  final sortLabel = [
+    ...sortModes.map((mode) => mode.label),
+    if (!hasNumericSort) 'Numéro croissant si égalité',
+  ].join(' → ');
     return Card(
       elevation: 1,
       shadowColor: Colors.black.withOpacity(0.08),
@@ -153,7 +163,7 @@ class SimulationAnalysisControls extends StatelessWidget {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    sortMode.label,
+                    sortLabel,
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -164,44 +174,56 @@ class SimulationAnalysisControls extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      tooltip: 'Ordre numérique croissant',
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 32,
-                        height: 32,
-                      ),
-                      padding: EdgeInsets.zero,
-                      onPressed: () => onSortModeChanged(
-                        SimulationNumberSortMode.numericAscending,
-                      ),
-                      icon: Icon(
-                        Icons.arrow_upward_rounded,
-                        size: 18,
-                        color: sortMode == SimulationNumberSortMode.numericAscending
-                            ? Colors.black87
-                            : Colors.grey.shade500,
-                      ),
+                    _buildSortButton(
+                      icon: Icons.arrow_upward_rounded,
+                      tooltip: SimulationNumberSortMode.numericAscending.label,
+                      mode: SimulationNumberSortMode.numericAscending,
+                      color: Colors.black87,
                     ),
-                    IconButton(
-                      tooltip: 'Ordre numérique décroissant',
-                      visualDensity: VisualDensity.compact,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 32,
-                        height: 32,
-                      ),
-                      padding: EdgeInsets.zero,
-                      onPressed: () => onSortModeChanged(
-                        SimulationNumberSortMode.numericDescending,
-                      ),
-                      icon: Icon(
-                        Icons.arrow_downward_rounded,
-                        size: 18,
-                        color: sortMode == SimulationNumberSortMode.numericDescending
-                            ? Colors.black87
-                            : Colors.grey.shade500,
-                      ),
+                    _buildSortButton(
+                      icon: Icons.arrow_downward_rounded,
+                      tooltip: SimulationNumberSortMode.numericDescending.label,
+                      mode: SimulationNumberSortMode.numericDescending,
+                      color: Colors.black87,
                     ),
+                    // IconButton(
+                    //   tooltip: 'Ordre numérique croissant',
+                    //   visualDensity: VisualDensity.compact,
+                    //   constraints: const BoxConstraints.tightFor(
+                    //     width: 32,
+                    //     height: 32,
+                    //   ),
+                    //   padding: EdgeInsets.zero,
+                    //   onPressed: () => onSortModeChanged(
+                    //     SimulationNumberSortMode.numericAscending,
+                    //   ),
+                    //   icon: Icon(
+                    //     Icons.arrow_upward_rounded,
+                    //     size: 18,
+                    //     color: sortMode == SimulationNumberSortMode.numericAscending
+                    //         ? Colors.black87
+                    //         : Colors.grey.shade500,
+                    //   ),
+                    // ),
+                    // IconButton(
+                    //   tooltip: 'Ordre numérique décroissant',
+                    //   visualDensity: VisualDensity.compact,
+                    //   constraints: const BoxConstraints.tightFor(
+                    //     width: 32,
+                    //     height: 32,
+                    //   ),
+                    //   padding: EdgeInsets.zero,
+                    //   onPressed: () => onSortModeChanged(
+                    //     SimulationNumberSortMode.numericDescending,
+                    //   ),
+                    //   icon: Icon(
+                    //     Icons.arrow_downward_rounded,
+                    //     size: 18,
+                    //     color: sortMode == SimulationNumberSortMode.numericDescending
+                    //         ? Colors.black87
+                    //         : Colors.grey.shade500,
+                    //   ),
+                    // ),
                   ],
                 ),
                 // TextButton.icon(
@@ -330,7 +352,7 @@ class SimulationAnalysisControls extends StatelessWidget {
     required SimulationNumberSortMode mode,
     required Color color,
   }) {
-    final selected = sortMode == mode;
+    final selected = sortModes.contains(mode);
 
     return IconButton(
       tooltip: tooltip,
