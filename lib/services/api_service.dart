@@ -221,4 +221,27 @@ class ApiService {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> createGroupGrid({
+    required int groupId,
+    required List<int> numbers,
+    required List<int> stars,
+    required DateTime drawDate,
+  }) async {
+    print('[Api] createGroupGrid -> POST /groups/$groupId/grids');
+
+    final response = await _dio.post(
+      '/groups/$groupId/grids',
+      data: {
+        'numbers': numbers,
+        'stars': stars,
+        'draw_date': _formatDateForApi(drawDate),
+      },
+    );
+
+    print('[Api] createGroupGrid status=${response.statusCode}');
+    print('[Api] createGroupGrid response=${response.data}');
+
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
 }

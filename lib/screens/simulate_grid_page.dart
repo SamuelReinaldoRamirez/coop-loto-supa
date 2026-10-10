@@ -52,6 +52,17 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   String? _drawError;
 
   SimulationStatistics _statistics = SimulationStatistics.empty();
+  // Sélection de la grille EuroMillions
+  final Set<int> _selectedNumbers = <int>{};
+  final Set<int> _selectedStars = <int>{};
+
+  bool _isGeneratingGrid = false;
+
+  bool get _canGenerateGrid =>
+      _selectedNumbers.length == 5 &&
+      _selectedStars.length == 2 &&
+      !_isGeneratingGrid;
+
 
   int get _selectedDrawHistoryCount => _drawHistoryCount.round();
   int get _selectedHotCount => _hotCount.round();
@@ -337,11 +348,158 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     );
   }
 
-  void _generateGrid() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Génération de grille — bientôt disponible.'),
-      ),
+  void _toggleNumber(int number) {
+    if (!mounted) return;
+
+    setState(() {
+      if (_selectedNumbers.contains(number)) {
+        _selectedNumbers.remove(number);
+      } else if (_selectedNumbers.length < 5) {
+        _selectedNumbers.add(number);
+      }
+    });
+  }
+
+  void _toggleStar(int star) {
+    if (!mounted) return;
+
+    setState(() {
+      if (_selectedStars.contains(star)) {
+        _selectedStars.remove(star);
+      } else if (_selectedStars.length < 2) {
+        _selectedStars.add(star);
+      }
+    });
+  }
+
+  
+  Future<void> _generateGrid() async {
+    if (_isGeneratingGrid) return;
+
+    if (_selectedNumbers.length != 5 ||
+        _selectedStars.length != 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Sélectionne exactement 5 numéros et 2 étoiles.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isGeneratingGrid = true;
+    });
+
+    try {
+      final drawDate = _getNextDrawDate();
+
+      final response = await _apiService.createGroupGrid(
+        groupId: widget.groupId,
+        numbers: _selectedNumbers.toList()..sort(),
+        stars: _selectedStars.toList()..sort(),
+        drawDate: drawDate,
+      );
+
+      if (!mounted) return;
+
+      if (response['success'] != true) {
+        throw Exception(
+          response['message'] ?? 'Impossible d’enregistrer la grille.',
+        );
+      }
+
+      setState(() {
+        _selectedNumbers.clear();
+        _selectedStars.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Grille ajoutée au groupe pour le '
+            '${drawDate.day.toString().padLeft(2, '0')}/'
+            '${drawDate.month.toString().padLeft(2, '0')}/'
+            '${drawDate.year}.',
+          ),
+        ),
+      );
+    } catch (error, stackTrace) {
+      debugPrint('[SimulateGridPage] Erreur création grille : $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Erreur lors de l’enregistrement : '
+            '${error.toString()}',
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingGrid = false;
+        });
+      }
+    }
+  }
+
+
+  DateTime _getNextDrawDate([DateTime? now]) {
+    final current = now ?? DateTime.now();
+
+    final weekday = current.weekday;
+    final minutes = current.hour * 60 + current.minute;
+    const cutoff = 20 * 60;
+
+    // Mardi avant 20 h : tirage du mardi.
+    if (weekday == DateTime.tuesday && minutes < cutoff) {
+      return DateTime(current.year, current.month, current.day);
+    }
+
+    // Vendredi avant 20 h : tirage du vendredi.
+    if (weekday == DateTime.friday && minutes < cutoff) {
+      return DateTime(current.year, current.month, current.day);
+    }
+
+    // À partir de mardi 20 h, le prochain tirage est vendredi.
+    if (weekday == DateTime.tuesday) {
+      return current.add(
+        Duration(days: DateTime.friday - DateTime.tuesday),
+      ).copyWith(
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+        microsecond: 0,
+      );
+    }
+
+    // À partir de vendredi 20 h, le prochain tirage est mardi.
+    if (weekday == DateTime.friday) {
+      return current.add(
+        const Duration(days: 4),
+      ).copyWith(
+        hour: 0,
+        minute: 0,
+        second: 0,
+        millisecond: 0,
+        microsecond: 0,
+      );
+    }
+
+    // Samedi, dimanche et lundi : mardi prochain.
+    final daysUntilTuesday =
+        (DateTime.tuesday - weekday + 7) % 7;
+
+    return DateTime(
+      current.year,
+      current.month,
+      current.day + daysUntilTuesday,
     );
   }
 
@@ -367,6 +525,12 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
             orderedNumbers: _orderedNumbers,
             analysisHighlightEnabled: _analysisHighlightEnabled,
             squareBordersEnabled: _squareBordersEnabled,
+            selectedNumbers: _selectedNumbers,
+            selectedStars: _selectedStars,
+            onNumberTap: _toggleNumber,
+            onStarTap: _toggleStar,
+            // canGenerateGrid: _canGenerateGrid,
+            // isGeneratingGrid: _isGeneratingGrid,
             onGenerateGrid: _generateGrid,
           ),
           if (!_isLoadingDraws && _drawError == null) ...[

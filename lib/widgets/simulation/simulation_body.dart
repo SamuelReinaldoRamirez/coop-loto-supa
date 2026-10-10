@@ -19,6 +19,10 @@ class SimulationBody extends StatelessWidget {
   final List<int> coldNumbers;
   final List<int> overdueNumbers;
   final List<int> orderedNumbers;
+  final Set<int> selectedNumbers;
+  final ValueChanged<int> onNumberTap;
+  final Set<int> selectedStars;
+  final ValueChanged<int> onStarTap;
   final bool analysisHighlightEnabled;
   final bool squareBordersEnabled;
   final VoidCallback onGenerateGrid;
@@ -37,6 +41,10 @@ class SimulationBody extends StatelessWidget {
     required this.coldNumbers,
     required this.overdueNumbers,
     required this.orderedNumbers,
+    required this.selectedNumbers,
+    required this.onNumberTap,
+    required this.selectedStars,
+    required this.onStarTap,
     required this.analysisHighlightEnabled,
     required this.squareBordersEnabled,
     required this.onGenerateGrid,
@@ -94,6 +102,8 @@ class SimulationBody extends StatelessWidget {
           coldNumbers: coldNumbers,
           overdueNumbers: overdueNumbers,
           orderedNumbers: orderedNumbers,
+          selectedNumbers: selectedNumbers,
+          onNumberTap: onNumberTap,
           analysisHighlightEnabled: analysisHighlightEnabled,
           squareBordersEnabled: squareBordersEnabled,
         ),
@@ -103,7 +113,11 @@ class SimulationBody extends StatelessWidget {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-        SimulationStarsGrid(squareBordersEnabled: squareBordersEnabled),
+        SimulationStarsGrid(
+          squareBordersEnabled: squareBordersEnabled,
+          selectedStars: selectedStars,
+          onStarTap: onStarTap,
+        ),
         const SizedBox(height: 24),
         const SimulationLegend(),
         const SizedBox(height: 24),
