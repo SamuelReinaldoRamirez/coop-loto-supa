@@ -10,6 +10,7 @@ import '../widgets/simulation/simulation_analysis_controls.dart';
 import '../widgets/simulation/simulation_body.dart';
 import '../widgets/simulation/simulation_navigation_arrow.dart';
 import '../widgets/simulation/simulation_number_sort_mode.dart';
+import '../services/simulation/simulation_analysis_state.dart';
 
 class SimulateGridPage extends StatefulWidget {
   final int groupId;
@@ -31,6 +32,8 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   final ApiService _apiService = ApiService();
   final SimulationStatisticsService _statisticsService =
       const SimulationStatisticsService();
+  final SimulationAnalysisState _analysisState =
+    SimulationAnalysisState.instance;
 
   bool _analysisHighlightEnabled = false;
   bool _squareBordersEnabled = false;
@@ -177,10 +180,42 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     });
   }
 
+  void _onAnalysisStateChanged() {
+    if (!mounted) return;
+
+    final historyChanged =
+        _drawHistoryCount.round() !=
+        _analysisState.drawHistoryCount.round();
+
+    setState(() {
+      _drawHistoryCount = _analysisState.drawHistoryCount;
+      _hotCount = _analysisState.hotCount;
+      _coldCount = _analysisState.coldCount;
+      _overdueCount = _analysisState.overdueCount;
+    });
+
+    if (historyChanged) {
+      _recalculateStatistics();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _analysisState.addListener(_onAnalysisStateChanged);
+
+    _drawHistoryCount = _analysisState.drawHistoryCount;
+    _hotCount = _analysisState.hotCount;
+    _coldCount = _analysisState.coldCount;
+    _overdueCount = _analysisState.overdueCount;
     _loadAllDraws();
+  }
+
+  @override
+  void dispose() {
+    print('🔴 simulate grid page DISPOSE');
+    _analysisState.removeListener(_onAnalysisStateChanged);
+    super.dispose();
   }
 
   Future<void> _loadAllDraws() async {
@@ -214,6 +249,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
         _draws = parsedDraws;
         _availableDrawCount = parsedDraws.length;
         _drawHistoryCount = min(30, _availableDrawCount).toDouble();
+        _analysisState.limitDrawHistory(_availableDrawCount);
         _isLoadingDraws = false;
         _drawError = null;
       });
@@ -247,6 +283,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   }
 
   void _onDrawHistoryChanged(double value) {
+    _analysisState.setDrawHistoryCount(value);
     setState(() {
       _drawHistoryCount = value.clamp(1, max(1, _availableDrawCount).toDouble()).toDouble();
     });
@@ -254,18 +291,21 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   }
 
   void _onHotChanged(double value) {
+    _analysisState.setHotCount(value);
     setState(() {
       _hotCount = value.clamp(1, 50).toDouble();
     });
   }
 
   void _onColdChanged(double value) {
+    _analysisState.setColdCount(value);
     setState(() {
       _coldCount = value.clamp(1, 50).toDouble();
     });
   }
 
   void _onOverdueChanged(double value) {
+    _analysisState.setOverdueCount(value);
     setState(() {
       _overdueCount = value.clamp(1, 50).toDouble();
     });
