@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../services/api_service.dart';
+import '../services/simulation/simulation_analysis_state.dart';
 import '../services/simulation/simulation_draw_parser.dart';
 import '../services/simulation/simulation_statistics_service.dart';
 import '../widgets/simulation/simulation_analysis_controls.dart';
 import '../widgets/simulation/simulation_body.dart';
 import '../widgets/simulation/simulation_navigation_arrow.dart';
 import '../widgets/simulation/simulation_number_sort_mode.dart';
-import '../services/simulation/simulation_analysis_state.dart';
 
 class SimulateGridPage extends StatefulWidget {
   final int groupId;
@@ -30,44 +30,48 @@ class SimulateGridPage extends StatefulWidget {
 
 class _SimulateGridPageState extends State<SimulateGridPage> {
   final ApiService _apiService = ApiService();
+
   final SimulationStatisticsService _statisticsService =
       const SimulationStatisticsService();
-  final SimulationAnalysisState _analysisState =
-    SimulationAnalysisState.instance;
 
-  bool _analysisHighlightEnabled = false;
+  final SimulationAnalysisState _analysisState =
+      SimulationAnalysisState.instance;
+
   bool _squareBordersEnabled = false;
+
   List<SimulationNumberSortMode> _sortModes = [
     SimulationNumberSortMode.numericAscending,
   ];
 
-  double _drawHistoryCount = 30;
-  double _hotCount = 10;
-  double _coldCount = 10;
-  double _overdueCount = 10;
-
   List<Map<String, dynamic>> _draws = [];
+
   int _availableDrawCount = 1;
   bool _isLoadingDraws = true;
   String? _drawError;
 
   SimulationStatistics _statistics = SimulationStatistics.empty();
-  // Sélection de la grille EuroMillions
+
   final Set<int> _selectedNumbers = <int>{};
   final Set<int> _selectedStars = <int>{};
 
   bool _isGeneratingGrid = false;
+
+  bool get _analysisHighlightEnabled =>
+      _analysisState.analysisHighlightEnabled;
 
   bool get _canGenerateGrid =>
       _selectedNumbers.length == 5 &&
       _selectedStars.length == 2 &&
       !_isGeneratingGrid;
 
+  int get _selectedDrawHistoryCount =>
+      _analysisState.selectedDrawHistoryCount
+          .clamp(1, max(1, _availableDrawCount))
+          .toInt();
 
-  int get _selectedDrawHistoryCount => _drawHistoryCount.round();
-  int get _selectedHotCount => _hotCount.round();
-  int get _selectedColdCount => _coldCount.round();
-  int get _selectedOverdueCount => _overdueCount.round();
+  int get _selectedHotCount => _analysisState.selectedHotCount;
+  int get _selectedColdCount => _analysisState.selectedColdCount;
+  int get _selectedOverdueCount => _analysisState.selectedOverdueCount;
 
   List<int> get _hotNumbers => _statisticsService.selectHotNumbers(
         _statistics.appearances,
@@ -84,7 +88,6 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
         _selectedOverdueCount,
       );
 
-  
   List<int> get _orderedNumbers {
     final numbers = List<int>.generate(50, (index) => index + 1);
 
@@ -132,104 +135,45 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
             break;
         }
 
-        // Dès qu'un critère départage les deux numéros,
-        // on utilise son résultat.
         if (comparison != 0) {
           return comparison;
         }
       }
 
-      // Égalité sur tous les critères : ordre numérique croissant.
       return a.compareTo(b);
     });
 
     return numbers;
   }
 
-  
-  void _onSortModeChanged(SimulationNumberSortMode mode) {
-    setState(() {
-      // Un clic sur une flèche numérique réinitialise le tri.
-      if (mode == SimulationNumberSortMode.numericAscending ||
-          mode == SimulationNumberSortMode.numericDescending) {
-        _sortModes = [mode];
-        return;
-      }
-
-      // Un critère statistique remplace le sens opposé
-      // du même critère.
-      final oppositeModes = <SimulationNumberSortMode, SimulationNumberSortMode>{
-        SimulationNumberSortMode.hotDescending:
-            SimulationNumberSortMode.hotAscending,
-        SimulationNumberSortMode.hotAscending:
-            SimulationNumberSortMode.hotDescending,
-        SimulationNumberSortMode.coldDescending:
-            SimulationNumberSortMode.coldAscending,
-        SimulationNumberSortMode.coldAscending:
-            SimulationNumberSortMode.coldDescending,
-        SimulationNumberSortMode.overdueDescending:
-            SimulationNumberSortMode.overdueAscending,
-        SimulationNumberSortMode.overdueAscending:
-            SimulationNumberSortMode.overdueDescending,
-      };
-
-      // Le tri numérique explicite est retiré :
-      // il restera le départage final croissant.
-      _sortModes.remove(SimulationNumberSortMode.numericAscending);
-      _sortModes.remove(SimulationNumberSortMode.numericDescending);
-
-      // On retire l'ancien sens du critère choisi.
-      final oppositeMode = oppositeModes[mode];
-      if (oppositeMode != null) {
-        _sortModes.remove(oppositeMode);
-      }
-
-      // Si ce critère était déjà présent, on le retire
-      // pour le replacer en première position.
-      _sortModes.remove(mode);
-      _sortModes.insert(0, mode);
-    });
-  }
-
-  void _onAnalysisStateChanged() {
-    if (!mounted) return;
-
-    final historyChanged =
-        _drawHistoryCount.round() !=
-        _analysisState.drawHistoryCount.round();
-
-    setState(() {
-      _drawHistoryCount = _analysisState.drawHistoryCount;
-      _hotCount = _analysisState.hotCount;
-      _coldCount = _analysisState.coldCount;
-      _overdueCount = _analysisState.overdueCount;
-    });
-
-    if (historyChanged) {
-      _recalculateStatistics();
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    _analysisState.addListener(_onAnalysisStateChanged);
 
-    _drawHistoryCount = _analysisState.drawHistoryCount;
-    _hotCount = _analysisState.hotCount;
-    _coldCount = _analysisState.coldCount;
-    _overdueCount = _analysisState.overdueCount;
+    _analysisState.addListener(_onAnalysisStateChanged);
     _loadAllDraws();
   }
 
   @override
   void dispose() {
-    print('🔴 simulate grid page DISPOSE');
+    debugPrint('🔴 simulate grid page DISPOSE');
+
     _analysisState.removeListener(_onAnalysisStateChanged);
+
     super.dispose();
   }
 
+  void _onAnalysisStateChanged() {
+    if (!mounted) return;
+
+    setState(() {});
+
+    _recalculateStatistics();
+  }
+
   Future<void> _loadAllDraws() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoadingDraws = true;
       _drawError = null;
@@ -237,10 +181,14 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
     try {
       debugPrint('[SimulateGridPage] Chargement de tous les tirages...');
+
       final response = await _apiService.fetchEuromillionsDraws();
+
       final parsedDraws = SimulationDrawParser.parseResponse(response);
 
-      debugPrint('[SimulateGridPage] Tirages valides : ${parsedDraws.length}');
+      debugPrint(
+        '[SimulateGridPage] Tirages valides : ${parsedDraws.length}',
+      );
 
       if (!mounted) return;
 
@@ -248,22 +196,23 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
         setState(() {
           _draws = [];
           _availableDrawCount = 1;
-          _drawHistoryCount = 1;
           _statistics = SimulationStatistics.empty();
           _isLoadingDraws = false;
           _drawError = 'Aucun tirage valide disponible.';
         });
+
+        _analysisState.limitDrawHistory(1);
         return;
       }
 
       setState(() {
         _draws = parsedDraws;
         _availableDrawCount = parsedDraws.length;
-        _drawHistoryCount = min(30, _availableDrawCount).toDouble();
-        _analysisState.limitDrawHistory(_availableDrawCount);
         _isLoadingDraws = false;
         _drawError = null;
       });
+
+      _analysisState.limitDrawHistory(_availableDrawCount);
 
       _recalculateStatistics();
     } catch (error, stackTrace) {
@@ -280,7 +229,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   }
 
   void _recalculateStatistics() {
-    if (_draws.isEmpty) return;
+    if (_draws.isEmpty || !mounted) return;
 
     final result = _statisticsService.calculate(
       draws: _draws,
@@ -288,44 +237,72 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     );
 
     if (!mounted) return;
+
     setState(() {
       _statistics = result;
     });
   }
 
   void _onDrawHistoryChanged(double value) {
-    _analysisState.setDrawHistoryCount(value);
-    setState(() {
-      _drawHistoryCount = value.clamp(1, max(1, _availableDrawCount).toDouble()).toDouble();
-    });
-    _recalculateStatistics();
+    _analysisState.setDrawHistoryCount(
+      value.clamp(1, max(1, _availableDrawCount).toDouble()).toDouble(),
+    );
   }
 
   void _onHotChanged(double value) {
     _analysisState.setHotCount(value);
-    setState(() {
-      _hotCount = value.clamp(1, 50).toDouble();
-    });
   }
 
   void _onColdChanged(double value) {
     _analysisState.setColdCount(value);
-    setState(() {
-      _coldCount = value.clamp(1, 50).toDouble();
-    });
   }
 
   void _onOverdueChanged(double value) {
     _analysisState.setOverdueCount(value);
+  }
+
+  void _onSortModeChanged(SimulationNumberSortMode mode) {
     setState(() {
-      _overdueCount = value.clamp(1, 50).toDouble();
+      if (mode == SimulationNumberSortMode.numericAscending ||
+          mode == SimulationNumberSortMode.numericDescending) {
+        _sortModes = [mode];
+        return;
+      }
+
+      final oppositeModes =
+          <SimulationNumberSortMode, SimulationNumberSortMode>{
+        SimulationNumberSortMode.hotDescending:
+            SimulationNumberSortMode.hotAscending,
+        SimulationNumberSortMode.hotAscending:
+            SimulationNumberSortMode.hotDescending,
+        SimulationNumberSortMode.coldDescending:
+            SimulationNumberSortMode.coldAscending,
+        SimulationNumberSortMode.coldAscending:
+            SimulationNumberSortMode.coldDescending,
+        SimulationNumberSortMode.overdueDescending:
+            SimulationNumberSortMode.overdueAscending,
+        SimulationNumberSortMode.overdueAscending:
+            SimulationNumberSortMode.overdueDescending,
+      };
+
+      _sortModes.remove(SimulationNumberSortMode.numericAscending);
+      _sortModes.remove(SimulationNumberSortMode.numericDescending);
+
+      final oppositeMode = oppositeModes[mode];
+
+      if (oppositeMode != null) {
+        _sortModes.remove(oppositeMode);
+      }
+
+      _sortModes.remove(mode);
+      _sortModes.insert(0, mode);
     });
   }
 
   void _toggleAnalysisHighlight() {
-    setState(() {
-      _analysisHighlightEnabled = !_analysisHighlightEnabled;
-    });
+    _analysisState.setAnalysisHighlightEnabled(
+      !_analysisState.analysisHighlightEnabled,
+    );
   }
 
   void _toggleSquareBorders() {
@@ -372,12 +349,10 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     });
   }
 
-  
   Future<void> _generateGrid() async {
     if (_isGeneratingGrid) return;
 
-    if (_selectedNumbers.length != 5 ||
-        _selectedStars.length != 2) {
+    if (_selectedNumbers.length != 5 || _selectedStars.length != 2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -385,6 +360,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
           ),
         ),
       );
+
       return;
     }
 
@@ -434,8 +410,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Erreur lors de l’enregistrement : '
-            '${error.toString()}',
+            'Erreur lors de l’enregistrement : ${error.toString()}',
           ),
         ),
       );
@@ -448,7 +423,6 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     }
   }
 
-
   DateTime _getNextDrawDate([DateTime? now]) {
     final current = now ?? DateTime.now();
 
@@ -456,20 +430,17 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
     final minutes = current.hour * 60 + current.minute;
     const cutoff = 20 * 60;
 
-    // Mardi avant 20 h : tirage du mardi.
     if (weekday == DateTime.tuesday && minutes < cutoff) {
       return DateTime(current.year, current.month, current.day);
     }
 
-    // Vendredi avant 20 h : tirage du vendredi.
     if (weekday == DateTime.friday && minutes < cutoff) {
       return DateTime(current.year, current.month, current.day);
     }
 
-    // À partir de mardi 20 h, le prochain tirage est vendredi.
     if (weekday == DateTime.tuesday) {
       return current.add(
-        Duration(days: DateTime.friday - DateTime.tuesday),
+        const Duration(days: 3),
       ).copyWith(
         hour: 0,
         minute: 0,
@@ -479,7 +450,6 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
       );
     }
 
-    // À partir de vendredi 20 h, le prochain tirage est mardi.
     if (weekday == DateTime.friday) {
       return current.add(
         const Duration(days: 4),
@@ -492,7 +462,6 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
       );
     }
 
-    // Samedi, dimanche et lundi : mardi prochain.
     final daysUntilTuesday =
         (DateTime.tuesday - weekday + 7) % 7;
 
@@ -529,8 +498,6 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
             selectedStars: _selectedStars,
             onNumberTap: _toggleNumber,
             onStarTap: _toggleStar,
-            // canGenerateGrid: _canGenerateGrid,
-            // isGeneratingGrid: _isGeneratingGrid,
             onGenerateGrid: _generateGrid,
           ),
           if (!_isLoadingDraws && _drawError == null) ...[
@@ -602,10 +569,10 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
   Widget _buildAnalysisControls() {
     return SimulationAnalysisControls(
-      drawHistoryCount: _drawHistoryCount,
-      hotCount: _hotCount,
-      coldCount: _coldCount,
-      overdueCount: _overdueCount,
+      drawHistoryCount: _analysisState.drawHistoryCount,
+      hotCount: _analysisState.hotCount,
+      coldCount: _analysisState.coldCount,
+      overdueCount: _analysisState.overdueCount,
       drawHistoryMax: _availableDrawCount,
       selectedDrawHistoryCount: _selectedDrawHistoryCount,
       selectedHotCount: _selectedHotCount,

@@ -1,4 +1,3 @@
-
 import 'package:flutter/foundation.dart';
 
 class SimulationAnalysisState extends ChangeNotifier {
@@ -12,10 +11,14 @@ class SimulationAnalysisState extends ChangeNotifier {
   double _coldCount = 10;
   double _overdueCount = 10;
 
+  bool _analysisHighlightEnabled = false;
+
   double get drawHistoryCount => _drawHistoryCount;
   double get hotCount => _hotCount;
   double get coldCount => _coldCount;
   double get overdueCount => _overdueCount;
+
+  bool get analysisHighlightEnabled => _analysisHighlightEnabled;
 
   int get selectedDrawHistoryCount => _drawHistoryCount.round();
   int get selectedHotCount => _hotCount.round();
@@ -23,26 +26,45 @@ class SimulationAnalysisState extends ChangeNotifier {
   int get selectedOverdueCount => _overdueCount.round();
 
   void setDrawHistoryCount(double value) {
-    if (_drawHistoryCount == value) return;
-    _drawHistoryCount = value;
+    final normalized = value.clamp(1, 1000000).toDouble();
+
+    if (_drawHistoryCount == normalized) return;
+
+    _drawHistoryCount = normalized;
     notifyListeners();
   }
 
   void setHotCount(double value) {
-    if (_hotCount == value) return;
-    _hotCount = value;
+    final normalized = value.clamp(1, 50).toDouble();
+
+    if (_hotCount == normalized) return;
+
+    _hotCount = normalized;
     notifyListeners();
   }
 
   void setColdCount(double value) {
-    if (_coldCount == value) return;
-    _coldCount = value;
+    final normalized = value.clamp(1, 50).toDouble();
+
+    if (_coldCount == normalized) return;
+
+    _coldCount = normalized;
     notifyListeners();
   }
 
   void setOverdueCount(double value) {
-    if (_overdueCount == value) return;
-    _overdueCount = value;
+    final normalized = value.clamp(1, 50).toDouble();
+
+    if (_overdueCount == normalized) return;
+
+    _overdueCount = normalized;
+    notifyListeners();
+  }
+
+  void setAnalysisHighlightEnabled(bool value) {
+    if (_analysisHighlightEnabled == value) return;
+
+    _analysisHighlightEnabled = value;
     notifyListeners();
   }
 

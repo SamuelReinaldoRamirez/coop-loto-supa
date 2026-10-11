@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -46,14 +45,9 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
           .clamp(1, _availableDrawCount)
           .toInt();
 
-  int get _selectedHotCount =>
-      _analysisState.selectedHotCount;
-
-  int get _selectedColdCount =>
-      _analysisState.selectedColdCount;
-
-  int get _selectedOverdueCount =>
-      _analysisState.selectedOverdueCount;
+  int get _selectedHotCount => _analysisState.selectedHotCount;
+  int get _selectedColdCount => _analysisState.selectedColdCount;
+  int get _selectedOverdueCount => _analysisState.selectedOverdueCount;
 
   @override
   void initState() {
@@ -77,12 +71,12 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
   }
 
   Future<void> _loadDraws() async {
-    if (mounted) {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-    }
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
       final response = await _apiService.fetchEuromillionsDraws();
@@ -109,18 +103,14 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
     }
   }
 
-  /// Calcule les statistiques connues AVANT le tirage étudié.
+  /// Calcule les statistiques connues avant chaque tirage étudié.
   ///
   /// Les tirages sont triés du plus récent au plus ancien.
-  /// On exclut donc le tirage courant et les tirages plus récents.
-  ///
-  /// Les listes retournées contiennent :
-  /// - number : le numéro concerné ;
-  /// - count : sa fréquence ou son retard.
+  /// On exclut le tirage courant et les tirages plus récents.
   Map<String, dynamic> _buildStatsForDraw(int drawIndex) {
+
     final previousDraws = _draws.skip(drawIndex + 1).toList();
 
-    // Aucun historique antérieur pour le tirage le plus ancien.
     if (previousDraws.isEmpty) {
       return {
         'hot': <Map<String, dynamic>>[],
@@ -129,8 +119,6 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
       };
     }
 
-    // On utilise au maximum le nombre de tirages demandé
-    // par le curseur noir, sans dépasser l'historique disponible.
     final historyCount = _analysisState.selectedDrawHistoryCount
         .clamp(1, previousDraws.length)
         .toInt();
@@ -140,20 +128,16 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
       selectedDrawCount: historyCount,
     );
 
-    // Sélection des numéros chauds pour CE tirage.
     final hotNumbers = _statisticsService.selectHotNumbers(
       statistics.appearances,
       _selectedHotCount,
     );
 
-    // Sélection des numéros froids pour CE tirage.
     final coldNumbers = _statisticsService.selectColdNumbers(
       statistics.appearances,
       _selectedColdCount,
     );
 
-    // Sélection des numéros les plus en retard à cette date.
-    // Le retard est calculé sur l'historique antérieur complet.
     final overdueNumbers = _statisticsService.selectOverdueNumbers(
       statistics.overdue,
       _selectedOverdueCount,
@@ -166,14 +150,12 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
           'count': statistics.appearances[number] ?? 0,
         };
       }).toList(),
-
       'cold': coldNumbers.map((number) {
         return {
           'number': number,
           'count': statistics.appearances[number] ?? 0,
         };
       }).toList(),
-
       'overdue': overdueNumbers.map((number) {
         return {
           'number': number,
@@ -289,17 +271,13 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
                           Expanded(
                             child: Text(
                               '${_draws.length} tirages disponibles',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall,
+                              style: Theme.of(context).textTheme.bodySmall,
                             ),
                           ),
                           Text(
                             'Historique : '
                             '$_selectedDrawHistoryCount tirages',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall,
+                            style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
                       ),
@@ -308,16 +286,12 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
                     Expanded(
                       child: _draws.isEmpty
                           ? const Center(
-                              child: Text(
-                                'Aucun tirage disponible.',
-                              ),
+                              child: Text('Aucun tirage disponible.'),
                             )
                           : ListView.builder(
                               itemCount: _draws.length,
                               itemBuilder: (context, index) {
                                 final draw = _draws[index];
-
-                                // Statistiques propres à ce tirage.
                                 final drawStats =
                                     _buildStatsForDraw(index);
 
@@ -325,8 +299,7 @@ class _PreviousDrawsPageState extends State<PreviousDrawsPage> {
                                   draw: draw,
                                   statsMode: true,
                                   stats: drawStats,
-                                  onTap: () =>
-                                      _openDrawDetails(draw),
+                                  onTap: () => _openDrawDetails(draw),
                                 );
                               },
                             ),
