@@ -1,4 +1,3 @@
-/// Critères de tri de la grille des 50 numéros.
 enum SimulationNumberSortMode {
   numericAscending,
   numericDescending,
@@ -8,27 +7,33 @@ enum SimulationNumberSortMode {
   coldAscending,
   overdueDescending,
   overdueAscending,
+  groupGridCountAscending,
+  groupGridCountDescending,
 }
 
 extension SimulationNumberSortModeLabel on SimulationNumberSortMode {
   String get label {
     switch (this) {
       case SimulationNumberSortMode.numericAscending:
-        return 'Ordre numérique';
+        return 'Numéro croissant';
       case SimulationNumberSortMode.numericDescending:
-        return 'Ordre numérique décroissant';
+        return 'Numéro décroissant';
       case SimulationNumberSortMode.hotDescending:
-        return 'Du plus hot au moins hot';
+        return 'Hot numbers décroissant';
       case SimulationNumberSortMode.hotAscending:
-        return 'Du moins hot au plus hot';
+        return 'Hot numbers croissant';
       case SimulationNumberSortMode.coldDescending:
-        return 'Du plus cold au moins cold';
+        return 'Cold numbers décroissant';
       case SimulationNumberSortMode.coldAscending:
-        return 'Du moins cold au plus cold';
+        return 'Cold numbers croissant';
       case SimulationNumberSortMode.overdueDescending:
-        return 'Du plus en retard au moins en retard';
+        return 'Retard décroissant';
       case SimulationNumberSortMode.overdueAscending:
-        return 'Du moins en retard au plus en retard';
+        return 'Retard croissant';
+      case SimulationNumberSortMode.groupGridCountAscending:
+        return 'Fréquence du groupe croissante';
+      case SimulationNumberSortMode.groupGridCountDescending:
+        return 'Fréquence du groupe décroissante';
     }
   }
 }
