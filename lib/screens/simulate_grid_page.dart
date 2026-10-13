@@ -23,6 +23,7 @@ import '../widgets/simulation/simulation_body.dart';
 import '../widgets/simulation/simulation_navigation_arrow.dart';
 
 import '../widgets/simulation/simulation_number_sort_mode.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 
 
@@ -417,7 +418,7 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
 
       final responses = await Future.wait<dynamic>([
         _apiService.fetchEuromillionsDraws(),
-        _apiService.fetchGroupGrids(widget.groupId),
+        _apiService.fetchGroupGridsNextDraw(widget.groupId),
       ]);
 
       final response = responses[0];
@@ -921,102 +922,178 @@ class _SimulateGridPageState extends State<SimulateGridPage> {
   }
 
 
-
   DateTime _getNextDrawDate([DateTime? now]) {
+    final paris = tz.getLocation('Europe/Paris');
 
-    final current = now ?? DateTime.now();
-
-
+    // L'heure courante est toujours interprétée dans le
+    // fuseau de Paris, quel que soit le fuseau du téléphone.
+    final tz.TZDateTime current = now == null
+        ? tz.TZDateTime.now(paris)
+        : tz.TZDateTime.from(now, paris);
 
     final weekday = current.weekday;
-
     final minutes = current.hour * 60 + current.minute;
 
     const cutoff = 20 * 60;
 
+    late final tz.TZDateTime nextDraw;
 
-
+    // Mardi avant 20 h : tirage du mardi.
     if (weekday == DateTime.tuesday && minutes < cutoff) {
-
-      return DateTime(current.year, current.month, current.day);
-
-    }
-
-
-
-    if (weekday == DateTime.friday && minutes < cutoff) {
-
-      return DateTime(current.year, current.month, current.day);
-
-    }
-
-
-
-    if (weekday == DateTime.tuesday) {
-
-      return current.add(
-
-        const Duration(days: 3),
-
-      ).copyWith(
-
-        hour: 0,
-
-        minute: 0,
-
-        second: 0,
-
-        millisecond: 0,
-
-        microsecond: 0,
-
+      nextDraw = tz.TZDateTime(
+        paris,
+        current.year,
+        current.month,
+        current.day,
       );
-
     }
-
-
-
-    if (weekday == DateTime.friday) {
-
-      return current.add(
-
-        const Duration(days: 4),
-
-      ).copyWith(
-
-        hour: 0,
-
-        minute: 0,
-
-        second: 0,
-
-        millisecond: 0,
-
-        microsecond: 0,
-
+    // Vendredi avant 20 h : tirage du vendredi.
+    else if (weekday == DateTime.friday && minutes < cutoff) {
+      nextDraw = tz.TZDateTime(
+        paris,
+        current.year,
+        current.month,
+        current.day,
       );
+    }
+    // Mardi à partir de 20 h : prochain tirage vendredi.
+    else if (weekday == DateTime.tuesday) {
+      nextDraw = tz.TZDateTime(
+        paris,
+        current.year,
+        current.month,
+        current.day + 3,
+      );
+    }
+    // Vendredi à partir de 20 h : prochain tirage mardi.
+    else if (weekday == DateTime.friday) {
+      nextDraw = tz.TZDateTime(
+        paris,
+        current.year,
+        current.month,
+        current.day + 4,
+      );
+    }
+    // Autres jours : prochain mardi.
+    else {
+      final daysUntilTuesday =
+          (DateTime.tuesday - weekday + 7) % 7;
 
+      nextDraw = tz.TZDateTime(
+        paris,
+        current.year,
+        current.month,
+        current.day + daysUntilTuesday,
+      );
     }
 
-
-
-    final daysUntilTuesday =
-
-        (DateTime.tuesday - weekday + 7) % 7;
-
-
-
+    // Retourne une date sans heure, compatible avec un champ SQL DATE.
+    // On conserve le jour calendaire de Paris sans convertir minuit
+    // vers le fuseau du téléphone.
     return DateTime(
-
-      current.year,
-
-      current.month,
-
-      current.day + daysUntilTuesday,
-
+      nextDraw.year,
+      nextDraw.month,
+      nextDraw.day,
     );
-
   }
+
+
+
+  // DateTime _getNextDrawDate([DateTime? now]) {
+
+  //   final current = now ?? DateTime.now();
+
+
+
+  //   final weekday = current.weekday;
+
+  //   final minutes = current.hour * 60 + current.minute;
+
+  //   const cutoff = 20 * 60;
+
+
+
+  //   if (weekday == DateTime.tuesday && minutes < cutoff) {
+
+  //     return DateTime(current.year, current.month, current.day);
+
+  //   }
+
+
+
+  //   if (weekday == DateTime.friday && minutes < cutoff) {
+
+  //     return DateTime(current.year, current.month, current.day);
+
+  //   }
+
+
+
+  //   if (weekday == DateTime.tuesday) {
+
+  //     return current.add(
+
+  //       const Duration(days: 3),
+
+  //     ).copyWith(
+
+  //       hour: 0,
+
+  //       minute: 0,
+
+  //       second: 0,
+
+  //       millisecond: 0,
+
+  //       microsecond: 0,
+
+  //     );
+
+  //   }
+
+
+
+  //   if (weekday == DateTime.friday) {
+
+  //     return current.add(
+
+  //       const Duration(days: 4),
+
+  //     ).copyWith(
+
+  //       hour: 0,
+
+  //       minute: 0,
+
+  //       second: 0,
+
+  //       millisecond: 0,
+
+  //       microsecond: 0,
+
+  //     );
+
+  //   }
+
+
+
+  //   final daysUntilTuesday =
+
+  //       (DateTime.tuesday - weekday + 7) % 7;
+
+
+
+  //   return DateTime(
+
+  //     current.year,
+
+  //     current.month,
+
+  //     current.day + daysUntilTuesday,
+
+  //   );
+
+  // }
 
 
 

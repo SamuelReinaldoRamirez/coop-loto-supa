@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:coop_loto_supa/main.dart' as app;
+import 'package:timezone/data/latest.dart' as tzdata;
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
+  tzdata.initializeTimeZones();
 
   // Petite pause pour pouvoir observer l'application pendant le test.
   Future<void> pause() async {

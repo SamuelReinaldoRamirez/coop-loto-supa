@@ -140,7 +140,7 @@ class _GroupPlayedGridsPageState extends State<GroupPlayedGridsPage> {
 
       final results = await Future.wait([
 
-        _apiService.fetchGroupGrids(widget.groupId),
+        _apiService.fetchGroupGridsNextDraw(widget.groupId),
 
         _apiService.fetchEuromillionsDraws(),
 

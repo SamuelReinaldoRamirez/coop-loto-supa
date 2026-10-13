@@ -119,10 +119,13 @@ class GroupMenuPage extends StatelessWidget {
                 icon: Icons.casino_rounded,
                 title: 'Historique des tirages',
                 onTap: () {
+                  // context.push(
+                  //   '/group/${group['id']}/draws'
+                  //   '?username=${Uri.encodeComponent(username)}',
+                  //   extra: group,
+                  // );
                   context.push(
-                    '/group/${group['id']}/draws'
-                    '?username=${Uri.encodeComponent(username)}',
-                    extra: group,
+                    '/group/${group['id']}/draw-history',
                   );
                 },
               ),

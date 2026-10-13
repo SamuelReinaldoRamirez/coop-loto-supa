@@ -12,6 +12,7 @@ import 'screens/previous_draws_page.dart';
 import 'screens/group_played_grids_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/buy_credits_page.dart';
+import 'screens/group_draw_history_page.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -56,6 +57,16 @@ class MyApp extends StatelessWidget {
             return GroupMenuPage(
               group: group,
               username: username,
+            );
+          },
+        ),
+        GoRoute(
+          path: '/group/:groupId/draw-history',
+          builder: (context, state) {
+            return GroupDrawHistoryPage(
+              groupId: int.parse(
+                state.pathParameters['groupId']!,
+              ),
             );
           },
         ),
