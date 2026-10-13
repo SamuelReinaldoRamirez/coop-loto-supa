@@ -13,9 +13,11 @@ import 'screens/group_played_grids_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/buy_credits_page.dart';
 import 'screens/group_draw_history_page.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  tzdata.initializeTimeZones();
   await initializeDateFormatting('fr_FR');
   runApp(const MyApp());
 }
