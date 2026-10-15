@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../services/auth_service.dart';
 import '../services/api_service.dart';
+import 'search_groups_page.dart';
 
 class HomePage extends StatefulWidget {
   final String username;
@@ -168,14 +169,27 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
 
+      // body: Center(
+      //   child: Text(
+      //     _titles[_currentIndex],
+      //     style: const TextStyle(
+      //       fontSize: 28,
+      //       fontWeight: FontWeight.bold,
+      //     ),
+      //   ),
+      // ),
       body: Center(
-        child: Text(
-          _titles[_currentIndex],
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
+        child: _currentIndex == 1
+        ? SearchGroupsPage(
+            username: widget.username,
+          )
+        : Text(
+            _titles[_currentIndex],
+            style: const TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
           ),
-        ),
       ),
 
       bottomNavigationBar: BottomNavigationBar(

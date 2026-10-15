@@ -13,6 +13,7 @@ import 'screens/group_played_grids_page.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'screens/buy_credits_page.dart';
 import 'screens/group_draw_history_page.dart';
+import 'screens/public_group_page.dart';
 import 'package:timezone/data/latest.dart' as tzdata;
 
 Future<void> main() async {
@@ -91,6 +92,23 @@ class MyApp extends StatelessWidget {
           path: '/buy-credits',
           builder: (context, state) {
             return const BuyCreditsPage();
+          },
+        ),
+        GoRoute(
+          path: '/public-group/:groupId',
+          builder: (context, state) {
+            final extra = state.extra;
+            final data = extra is Map ? extra : const {};
+
+            final groupId = int.parse(
+              state.pathParameters['groupId']!,
+            );
+
+            return PublicGroupPage(
+              username: data['username']?.toString() ?? '',
+              groupId: groupId,
+              initialGroup: data['group'],
+            );
           },
         ),
         GoRoute(

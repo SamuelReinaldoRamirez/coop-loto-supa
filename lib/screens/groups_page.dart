@@ -16,6 +16,7 @@ class GroupsPage extends StatefulWidget {
 
 class _GroupsPageState extends State<GroupsPage> {
   final ApiService _api = ApiService();
+  final Set<int> _leavingGroupIds = {};
 
   bool _loading = true;
   List<dynamic> _userGroups = [];
@@ -41,6 +42,89 @@ class _GroupsPageState extends State<GroupsPage> {
       setState(() => _loading = false);
     }
   }
+
+
+  Future<void> _leaveGroup({
+    required int groupId,
+    required String groupName,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Quitter le groupe ?'),
+          content: Text(
+            'Voulez-vous vraiment quitter "$groupName" ? '
+            'Vous ne pourrez plus accéder à ses grilles '
+            'ni à ses informations réservées aux membres.'
+            'Vous perdrez égalements vos droits sur ses gains',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text('Quitter le groupe'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _leavingGroupIds.add(groupId);
+    });
+
+    try {
+      await _api.leaveGroup(groupId);
+
+      if (!mounted) return;
+
+      setState(() {
+        _userGroups = _userGroups.where((group) {
+          if (group is! Map || group['id'] == null) {
+            return true;
+          }
+
+          return int.tryParse(group['id'].toString()) != groupId;
+        }).toList();
+
+        _leavingGroupIds.remove(groupId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Vous avez quitté "$groupName".'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _leavingGroupIds.remove(groupId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString().replaceFirst('Exception: ', ''),
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
 
   void _buyGridsForGroups() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -155,7 +239,10 @@ class _GroupsPageState extends State<GroupsPage> {
                                 : (g is Map && g['id'] != null)
                                     ? 'Groupe ${g['id']}'
                                     : g.toString(),
-                            groupId: g is Map ? g['id'] : null,
+                            // groupId: g is Map ? g['id'] : null,
+                            groupId: g is Map && g['id'] != null
+                              ? int.tryParse(g['id'].toString())
+                              : null,
                           ),
                       ],
                     ),
@@ -236,12 +323,16 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 
+  
   Widget _buildGroupCard(
     BuildContext context, {
     required dynamic group,
     required String name,
-    required dynamic groupId,
+    required int? groupId,
   }) {
+    final isLeaving = groupId != null &&
+        _leavingGroupIds.contains(groupId);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 14),
       elevation: 3,
@@ -249,82 +340,118 @@ class _GroupsPageState extends State<GroupsPage> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () {
-          final encoded = Uri.encodeComponent(widget.username);
+      child: Padding(
+        padding: const EdgeInsets.only(
+          left: 8,
+          top: 8,
+          bottom: 8,
+          right: 8,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(14),
+                onTap: groupId == null
+                    ? null
+                    : () {
+                        final encoded =
+                            Uri.encodeComponent(widget.username);
 
-          context.push(
-            '/group/$groupId/menu?username=$encoded',
-            extra: group,
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(
-                  Icons.groups_rounded,
-                  size: 28,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-
-              const SizedBox(width: 16),
-
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (groupId != null) ...[
-                      const SizedBox(height: 5),
-                      Text(
-                        'Groupe #$groupId',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey.shade600,
+                        context.push(
+                          '/group/$groupId/menu?username=$encoded',
+                          extra: group,
+                        );
+                      },
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(15),
+                        ),
+                        child: Icon(
+                          Icons.groups_rounded,
+                          size: 28,
+                          color:
+                              Theme.of(context).colorScheme.primary,
                         ),
                       ),
-                    ],
-                  ],
-                ),
-              ),
 
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 24,
+                      const SizedBox(width: 16),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (groupId != null) ...[
+                              const SizedBox(height: 5),
+                              Text(
+                                'Groupe #$groupId',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        size: 24,
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+
+            const SizedBox(width: 4),
+
+            IconButton(
+              tooltip: 'Quitter le groupe',
+              onPressed: groupId == null || isLeaving
+                  ? null
+                  : () => _leaveGroup(
+                        groupId: groupId,
+                        groupName: name,
+                      ),
+              icon: isLeaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.logout_rounded,
+                      color: Colors.red,
+                    ),
+            ),
+          ],
         ),
       ),
     );
   }
+
 
   Widget _buildEmptyState() {
     return Center(
@@ -376,245 +503,3 @@ class _GroupsPageState extends State<GroupsPage> {
     );
   }
 }
-
-// import 'package:flutter/material.dart';
-// import 'package:go_router/go_router.dart';
-// import '../services/api_service.dart';
-
-// class GroupsPage extends StatefulWidget {
-//   final String username;
-
-//   const GroupsPage({
-//     super.key,
-//     required this.username,
-//   });
-
-//   @override
-//   State<GroupsPage> createState() => _GroupsPageState();
-// }
-
-// class _GroupsPageState extends State<GroupsPage> {
-//   final ApiService _api = ApiService();
-
-//   bool _loading = true;
-//   List<dynamic> _userGroups = [];
-
-//   @override
-//   void initState() {
-//     super.initState();
-//     _load();
-//   }
-
-//   Future<void> _load() async {
-//     setState(() => _loading = true);
-
-//     try {
-//       final userGroups = await _api.fetchMyGroups();
-
-//       setState(() {
-//         _userGroups = userGroups;
-//       });
-//     } catch (e) {
-//       print('[Groups] Error loading groups: $e');
-//     } finally {
-//       setState(() => _loading = false);
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       backgroundColor: const Color(0xFFF5F6FA),
-//       appBar: AppBar(
-//         leading: IconButton(
-//           icon: const Icon(Icons.arrow_back),
-//           onPressed: () {
-//             context.go('/home', extra: widget.username);
-//           },
-//         ),
-//         title: const Text(
-//           'Mes groupes',
-//           style: TextStyle(
-//             fontWeight: FontWeight.bold,
-//           ),
-//         ),
-//         elevation: 0,
-//       ),
-//       body: _loading
-//           ? const Center(
-//               child: CircularProgressIndicator(),
-//             )
-//           : _userGroups.isEmpty
-//               ? _buildEmptyState()
-//               : RefreshIndicator(
-//                   onRefresh: _load,
-//                   child: ListView.builder(
-//                     padding: const EdgeInsets.all(16),
-//                     itemCount: _userGroups.length,
-//                     itemBuilder: (context, idx) {
-//                       final g = _userGroups[idx];
-
-//                       final name = (g is Map && g['name'] != null)
-//                           ? g['name'].toString()
-//                           : (g is Map && g['id'] != null)
-//                               ? 'Groupe ${g['id']}'
-//                               : g.toString();
-
-//                       final groupId =
-//                           g is Map ? g['id'] : null;
-
-//                       return _buildGroupCard(
-//                         context,
-//                         group: g,
-//                         name: name,
-//                         groupId: groupId,
-//                       );
-//                     },
-//                   ),
-//                 ),
-//     );
-//   }
-
-//   Widget _buildGroupCard(
-//     BuildContext context, {
-//     required dynamic group,
-//     required String name,
-//     required dynamic groupId,
-//   }) {
-//     return Card(
-//       margin: const EdgeInsets.only(bottom: 14),
-//       elevation: 3,
-//       shadowColor: Colors.black.withOpacity(0.12),
-//       shape: RoundedRectangleBorder(
-//         borderRadius: BorderRadius.circular(18),
-//       ),
-//       child: InkWell(
-//         borderRadius: BorderRadius.circular(18),
-//         onTap: () {
-//           final encoded = Uri.encodeComponent(widget.username);
-
-//           // context.push(
-//           //   '/group/$groupId?username=$encoded',
-//           //   extra: group as Map<String, dynamic>,
-//           // );
-//           context.push(
-//             '/group/$groupId/menu?username=$encoded',
-//             extra: group,
-//           );
-//         },
-//         child: Padding(
-//           padding: const EdgeInsets.all(18),
-//           child: Row(
-//             children: [
-//               // Icône du groupe
-//               Container(
-//                 width: 52,
-//                 height: 52,
-//                 decoration: BoxDecoration(
-//                   color: Theme.of(context)
-//                       .colorScheme
-//                       .primary
-//                       .withOpacity(0.1),
-//                   borderRadius: BorderRadius.circular(15),
-//                 ),
-//                 child: Icon(
-//                   Icons.groups_rounded,
-//                   size: 28,
-//                   color: Theme.of(context).colorScheme.primary,
-//                 ),
-//               ),
-
-//               const SizedBox(width: 16),
-
-//               // Nom + ID
-//               Expanded(
-//                 child: Column(
-//                   crossAxisAlignment: CrossAxisAlignment.start,
-//                   children: [
-//                     Text(
-//                       name,
-//                       style: const TextStyle(
-//                         fontSize: 17,
-//                         fontWeight: FontWeight.bold,
-//                       ),
-//                     ),
-//                     if (groupId != null) ...[
-//                       const SizedBox(height: 5),
-//                       Text(
-//                         'Groupe #$groupId',
-//                         style: TextStyle(
-//                           fontSize: 13,
-//                           color: Colors.grey.shade600,
-//                         ),
-//                       ),
-//                     ],
-//                   ],
-//                 ),
-//               ),
-
-//               // Flèche
-//               Container(
-//                 width: 36,
-//                 height: 36,
-//                 decoration: BoxDecoration(
-//                   color: Colors.grey.shade100,
-//                   shape: BoxShape.circle,
-//                 ),
-//                 child: const Icon(
-//                   Icons.chevron_right_rounded,
-//                   size: 24,
-//                 ),
-//               ),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-
-//   Widget _buildEmptyState() {
-//     return Center(
-//       child: Padding(
-//         padding: const EdgeInsets.all(32),
-//         child: Column(
-//           mainAxisAlignment: MainAxisAlignment.center,
-//           children: [
-//             Container(
-//               width: 90,
-//               height: 90,
-//               decoration: BoxDecoration(
-//                 color: Theme.of(context)
-//                     .colorScheme
-//                     .primary
-//                     .withOpacity(0.1),
-//                 shape: BoxShape.circle,
-//               ),
-//               child: Icon(
-//                 Icons.groups_outlined,
-//                 size: 45,
-//                 color: Theme.of(context).colorScheme.primary,
-//               ),
-//             ),
-//             const SizedBox(height: 20),
-//             const Text(
-//               'Aucun groupe',
-//               style: TextStyle(
-//                 fontSize: 21,
-//                 fontWeight: FontWeight.bold,
-//               ),
-//             ),
-//             const SizedBox(height: 8),
-//             Text(
-//               'Vous ne faites actuellement partie d’aucun groupe.',
-//               textAlign: TextAlign.center,
-//               style: TextStyle(
-//                 fontSize: 15,
-//                 color: Colors.grey.shade600,
-//               ),
-//             ),
-//           ],
-//         ),
-//       ),
-//     );
-//   }
-// }
